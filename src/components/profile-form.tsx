@@ -33,8 +33,7 @@ interface CountrySuggestion {
   name: string;
   code: string;
 }
-
-const RegistrationForm: React.FC = () => {
+ const RegistrationForm: React.FC = () => {
   const [formData, setFormData] = useState<FormData>({
     fullName: "",
     homeTown: "",
@@ -51,6 +50,7 @@ const RegistrationForm: React.FC = () => {
   const [countrySuggestions, setCountrySuggestions] = useState<CountrySuggestion[]>([]);
   const [showHometownSuggestions, setShowHometownSuggestions] = useState<boolean>(false);
   const [hometownSuggestions, setHometownSuggestions] = useState<string[]>([]);
+  const [allCities, setAllCities] = useState<string[]>([]);
 
   // Fetch country suggestions from the Rest Countries API and store both name and code.
   useEffect(() => {
@@ -86,35 +86,49 @@ const RegistrationForm: React.FC = () => {
 
   // Fetch hometown suggestions using the countryCode (if available) from GeoDB Cities API.
   useEffect(() => {
-    const fetchHometowns = async () => {
-      if (!formData.countryCode || formData.homeTown.trim() === "") {
-        setHometownSuggestions([]);
-        return;
-      }
+    const fetchCities = async () => {
       try {
-        const response = await fetch(
-          `http://geodb-free-service.wirefreethought.com/v1/geo/cities?countryIds=${formData.countryCode}&namePrefix=${formData.homeTown}&limit=5`
-        );
+        const response = await fetch("https://countriesnow.space/api/v0.1/countries/cities", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ country: formData.country }),
+        });
         if (response.ok) {
           const data = await response.json();
-          const names = data.data.map((city: any) => city.name);
-          setHometownSuggestions(names);
+          // data.data is assumed to be an array of city names.
+          setAllCities(data.data);
         } else {
-          setHometownSuggestions([]);
+          setAllCities([]);
         }
       } catch (error) {
-        console.error("Error fetching hometowns:", error);
-        setHometownSuggestions([]);
+        console.error("Error fetching cities:", error);
+        setAllCities([]);
       }
     };
-
+  
+    fetchCities();
+  }, [formData.country]);
+  
+  useEffect(() => {
+    // Reduce debounce delay to 100ms
     const debounceFn = setTimeout(() => {
-      fetchHometowns();
-    }, 300);
-
+      if (formData.homeTown.trim() === "") {
+        setHometownSuggestions(allCities.slice(0, 5));
+      } else {
+        const filteredCities = allCities.filter((city) =>
+          city.toLowerCase().startsWith(formData.homeTown.toLowerCase())
+        );
+        setHometownSuggestions(filteredCities.slice(0, 5));
+      }
+    }, 100);
+    
     return () => clearTimeout(debounceFn);
-  }, [formData.homeTown, formData.countryCode]);
-
+  }, [formData.homeTown, allCities]);
+  
+  
+  
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     // If the user manually types in a country, clear any previously stored country code.
@@ -150,7 +164,13 @@ const RegistrationForm: React.FC = () => {
   const handleCountryFocus = () => setShowCountrySuggestions(true);
   const handleCountryBlur = () => setTimeout(() => setShowCountrySuggestions(false), 150);
 
-  const handleHometownFocus = () => setShowHometownSuggestions(true);
+  const handleHometownFocus = () => {
+    setShowHometownSuggestions(true);
+    // If there are cached cities and no input yet, show the first 5 immediately.
+    if (allCities.length > 0 && formData.homeTown.trim() === "") {
+      setHometownSuggestions(allCities.slice(0, 5));
+    }
+  };
   const handleHometownBlur = () => setTimeout(() => setShowHometownSuggestions(false), 150);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -327,6 +347,4 @@ const RegistrationForm: React.FC = () => {
   );
 };
 
-export default RegistrationForm;
-
-
+export default RegistrationForm
