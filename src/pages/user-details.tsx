@@ -1,5 +1,4 @@
 import { Button, Card, Col, Container, Row } from "react-bootstrap";
-import pic from "../assets/pic5.jpeg";
 import {
   FaGraduationCap,
   FaMapMarkerAlt,
@@ -15,10 +14,34 @@ import phone from "../assets/phone.png";
 import x from "../assets/x.png";
 import { useEffect, useRef, useState } from "react";
 import { EditProfileModal } from "./edit-profile";
+import { auth } from "../firebase";
+import { getUser } from "../backend/services/user-service";
+import { DocumentData } from "firebase/firestore";
 
 export const UserDetails = () => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [editProfile, setEditProfile] = useState<boolean>(false);
+  const [userInfo, setUserInfo] = useState<DocumentData | null>({});
+  const user = auth.currentUser;
+
+  useEffect(() => {
+    const getUserFn = async () => {
+      if (!user || !user.uid) return;
+
+      try {
+        const userDetails = await getUser(user.uid);
+        setUserInfo(userDetails);
+        console.log(
+          JSON.stringify(userDetails, null, 2),
+          "Fetched user details"
+        );
+      } catch (error) {
+        console.error("Error fetching user data:", error);
+      }
+    };
+
+    getUserFn();
+  }, [user]); // Runs only when `user` changes
 
   useEffect(() => {
     if (containerRef.current) {
@@ -30,6 +53,7 @@ export const UserDetails = () => {
     setEditProfile(!editProfile);
     console.log("pressed");
   };
+
   return (
     <Container
       fluid
@@ -52,14 +76,14 @@ export const UserDetails = () => {
         <Row className="align-items-center">
           <Col md={3} className="text-center">
             <img
-              src={`${pic}`}
+              src={`${userInfo?.imageUrl}`}
               alt="Profile"
               className="rounded-circle img-fluid"
             />
           </Col>
           <Col md={6}>
-            <h2>Jane Smith</h2>
-            <p className="text-muted">Software Engineer | Tech Enthusiast</p>
+            <h2>{userInfo?.name}</h2>
+            <p className="text-muted">{userInfo?.email}</p>
             <p>"Passionate about building impactful solutions."</p>
           </Col>
           <Col md={3} className="text-center">
@@ -116,7 +140,7 @@ export const UserDetails = () => {
           >
             <h4>
               <FaPaintBrush size={40} color=" #60a5fa" />
-              Hobbies and Interests
+              Hobbies
             </h4>
             <p>Cooking </p>
             <p>Crochet</p>

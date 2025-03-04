@@ -3,8 +3,8 @@ import { Form, Button, Row, Col, FloatingLabel } from "react-bootstrap";
 import { useSelector } from "react-redux";
 import { RootState } from "../store";
 import { useNavigate } from "react-router-dom";
-
-import { useNavigate } from "react-router-dom";
+import { saveAdditionalUserInfo } from "../backend/services/user-service";
+import { cloudName } from "../backend/services/upload-image";
 
 interface FormData {
   fullName: string;
@@ -218,11 +218,62 @@ const RegistrationForm: React.FC = () => {
       setPreview(URL.createObjectURL(file));
     }
   };
+  console.log(formData.profilePicture, "picture");
+  const uploadImage = async (
+    file: File
+  ): Promise<string | null | undefined> => {
+    if (!file) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    console.log("Form Data Submitted:", formData);
-    navigate("/chat");
+    const data = new FormData();
+    data.append("file", file);
+    data.append("upload_preset", "OldPals");
+    data.append("cloud_name", cloudName);
+
+    try {
+      const response = await fetch(
+        `      https://api.cloudinary.com/v1_1/${cloudName}/image/upload`,
+        { method: "POST", body: data }
+      );
+
+      const result = await response.json();
+      // console.log("Upload success:", result);
+      return result.secure_url; // Cloudinary URL of the uploaded image
+    } catch (err) {
+      console.log(err);
+      return;
+    }
+  };
+  const handleSubmit = async (e: React.FormEvent) => {
+    try {
+      e.preventDefault();
+
+      if (!formData.profilePicture) {
+        return `No picture selected`;
+      }
+
+      const uploadedImageUrl = await uploadImage(formData.profilePicture);
+
+      if (!uploadedImageUrl) {
+        console.log("Image upload failed");
+        return;
+      }
+
+      const data = {
+        school: formData.school,
+        imageUrl: uploadedImageUrl,
+        Interests: formData.interests,
+        country: formData.country,
+        homeTown: formData.homeTown,
+        age: Number(formData.age),
+      };
+      console.log(data);
+      console.log("Form Data Submitted:", formData);
+      const response = await saveAdditionalUserInfo(data);
+      console.log(response);
+      navigate("/search");
+    } catch (err) {
+      console.log(err, "error from updating user details");
+    }
   };
 
   return (
@@ -399,7 +450,7 @@ const RegistrationForm: React.FC = () => {
       <Button
         type="submit"
         className="w-100 rounded-pill btn-primary"
-        onClick={() => navigate("/search")}
+        onClick={handleSubmit}
       >
         Register
       </Button>
