@@ -8,6 +8,7 @@ import {
   ProfilePage,
   SignIn,
 } from "./pages";
+import MessagingPage from "./components/message";
 
 function App() {
   return (
@@ -19,6 +20,7 @@ function App() {
         <Route path="/profile" element={<ProfilePage />} />
         <Route path="/not-found" element={<NotFound />} />
         <Route path="/error" element={<ErrorPage />} />
+        <Route path="/chat" element={<MessagingPage/>}/>
       </Routes>
     </Router>
   );
