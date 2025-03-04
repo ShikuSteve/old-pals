@@ -1,7 +1,7 @@
-
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { Container, Card } from "react-bootstrap";
 import RegistrationForm from "../components/profile-form";
+import Loader from "../components/loader";
 
 const backgroundStyle: React.CSSProperties = {
   width: "100vw",
@@ -10,6 +10,19 @@ const backgroundStyle: React.CSSProperties = {
 };
 
 export const ProfilePage: React.FC = () => {
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsLoading(false);
+    }, 1000);
+
+    return () => clearTimeout(timer);
+  }, []);
+
+  if (isLoading) {
+    return <Loader />;
+  }
   return (
     <Container
       fluid

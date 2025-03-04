@@ -1,7 +1,7 @@
-
 import React, { useEffect, useState } from "react";
 import { Form, Button, Row, Col, FloatingLabel } from "react-bootstrap";
 
+import { useNavigate } from "react-router-dom";
 
 interface FormData {
   fullName: string;
@@ -33,7 +33,7 @@ interface CountrySuggestion {
   name: string;
   code: string;
 }
- const RegistrationForm: React.FC = () => {
+const RegistrationForm: React.FC = () => {
   const [formData, setFormData] = useState<FormData>({
     fullName: "",
     homeTown: "",
@@ -45,12 +45,19 @@ interface CountrySuggestion {
     profilePicture: null,
   });
   const [preview, setPreview] = useState<string | null>(null);
-  const [showInterestSuggestions, setShowInterestSuggestions] = useState<boolean>(false);
-  const [showCountrySuggestions, setShowCountrySuggestions] = useState<boolean>(false);
-  const [countrySuggestions, setCountrySuggestions] = useState<CountrySuggestion[]>([]);
-  const [showHometownSuggestions, setShowHometownSuggestions] = useState<boolean>(false);
+  const [showInterestSuggestions, setShowInterestSuggestions] =
+    useState<boolean>(false);
+  const [showCountrySuggestions, setShowCountrySuggestions] =
+    useState<boolean>(false);
+  const [countrySuggestions, setCountrySuggestions] = useState<
+    CountrySuggestion[]
+  >([]);
+  const [showHometownSuggestions, setShowHometownSuggestions] =
+    useState<boolean>(false);
   const [hometownSuggestions, setHometownSuggestions] = useState<string[]>([]);
   const [allCities, setAllCities] = useState<string[]>([]);
+
+  const navigate = useNavigate();
 
   // Fetch country suggestions from the Rest Countries API and store both name and code.
   useEffect(() => {
@@ -60,7 +67,9 @@ interface CountrySuggestion {
         return;
       }
       try {
-        const response = await fetch(`https://restcountries.com/v3.1/name/${formData.country}`);
+        const response = await fetch(
+          `https://restcountries.com/v3.1/name/${formData.country}`
+        );
         if (response.ok) {
           const data = await response.json();
           const suggestions: CountrySuggestion[] = data.map((country: any) => ({
@@ -88,13 +97,16 @@ interface CountrySuggestion {
   useEffect(() => {
     const fetchCities = async () => {
       try {
-        const response = await fetch("https://countriesnow.space/api/v0.1/countries/cities", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ country: formData.country }),
-        });
+        const response = await fetch(
+          "https://countriesnow.space/api/v0.1/countries/cities",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ country: formData.country }),
+          }
+        );
         if (response.ok) {
           const data = await response.json();
           // data.data is assumed to be an array of city names.
@@ -107,10 +119,10 @@ interface CountrySuggestion {
         setAllCities([]);
       }
     };
-  
+
     fetchCities();
   }, [formData.country]);
-  
+
   useEffect(() => {
     // Reduce debounce delay to 100ms
     const debounceFn = setTimeout(() => {
@@ -123,17 +135,21 @@ interface CountrySuggestion {
         setHometownSuggestions(filteredCities.slice(0, 5));
       }
     }, 100);
-    
+
     return () => clearTimeout(debounceFn);
   }, [formData.homeTown, allCities]);
-  
-  
-  
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+  ) => {
     const { name, value } = e.target;
     // If the user manually types in a country, clear any previously stored country code.
     if (name === "country") {
-      setFormData((prev) => ({ ...prev, [name]: value, countryCode: undefined }));
+      setFormData((prev) => ({
+        ...prev,
+        [name]: value,
+        countryCode: undefined,
+      }));
     } else {
       setFormData((prev) => ({ ...prev, [name]: value }));
     }
@@ -144,7 +160,11 @@ interface CountrySuggestion {
   );
 
   const handleCountryOptionClick = (suggestion: CountrySuggestion) => {
-    setFormData((prev) => ({ ...prev, country: suggestion.name, countryCode: suggestion.code }));
+    setFormData((prev) => ({
+      ...prev,
+      country: suggestion.name,
+      countryCode: suggestion.code,
+    }));
     setShowCountrySuggestions(false);
   };
 
@@ -159,10 +179,12 @@ interface CountrySuggestion {
   };
 
   const handleFocus = () => setShowInterestSuggestions(true);
-  const handleBlur = () => setTimeout(() => setShowInterestSuggestions(false), 150);
+  const handleBlur = () =>
+    setTimeout(() => setShowInterestSuggestions(false), 150);
 
   const handleCountryFocus = () => setShowCountrySuggestions(true);
-  const handleCountryBlur = () => setTimeout(() => setShowCountrySuggestions(false), 150);
+  const handleCountryBlur = () =>
+    setTimeout(() => setShowCountrySuggestions(false), 150);
 
   const handleHometownFocus = () => {
     setShowHometownSuggestions(true);
@@ -171,7 +193,8 @@ interface CountrySuggestion {
       setHometownSuggestions(allCities.slice(0, 5));
     }
   };
-  const handleHometownBlur = () => setTimeout(() => setShowHometownSuggestions(false), 150);
+  const handleHometownBlur = () =>
+    setTimeout(() => setShowHometownSuggestions(false), 150);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
@@ -214,7 +237,10 @@ interface CountrySuggestion {
               onBlur={handleCountryBlur}
             />
             {showCountrySuggestions && countrySuggestions.length > 0 && (
-              <div className="list-group position-absolute" style={{ zIndex: 1000, width: "100%" }}>
+              <div
+                className="list-group position-absolute"
+                style={{ zIndex: 1000, width: "100%" }}
+              >
                 {countrySuggestions.map((suggestion) => (
                   <button
                     type="button"
@@ -242,7 +268,10 @@ interface CountrySuggestion {
               required
             />
             {showHometownSuggestions && hometownSuggestions.length > 0 && (
-              <div className="list-group position-absolute" style={{ zIndex: 1000, width: "100%" }}>
+              <div
+                className="list-group position-absolute"
+                style={{ zIndex: 1000, width: "100%" }}
+              >
                 {hometownSuggestions.map((option) => (
                   <button
                     type="button"
@@ -296,7 +325,10 @@ interface CountrySuggestion {
               onBlur={handleBlur}
             />
             {showInterestSuggestions && filteredInterestOptions.length > 0 && (
-              <div className="list-group position-absolute" style={{ zIndex: 1000, width: "100%" }}>
+              <div
+                className="list-group position-absolute"
+                style={{ zIndex: 1000, width: "100%" }}
+              >
                 {filteredInterestOptions.map((option) => (
                   <button
                     type="button"
@@ -324,27 +356,39 @@ interface CountrySuggestion {
         />
       </FloatingLabel>
 
-    
       {preview && (
         <div className="text-center mb-3">
           <img
             src={preview}
             alt="Profile Preview"
-            style={{ width: "80px", height: "80px", objectFit: "cover", borderRadius: "50%" }}
+            style={{
+              width: "80px",
+              height: "80px",
+              objectFit: "cover",
+              borderRadius: "50%",
+            }}
           />
         </div>
       )}
 
       <Form.Group controlId="formFile" className="mb-4">
         <Form.Label>Upload Profile Picture</Form.Label>
-        <Form.Control type="file" accept="image/*" onChange={handleFileChange} />
+        <Form.Control
+          type="file"
+          accept="image/*"
+          onChange={handleFileChange}
+        />
       </Form.Group>
 
-      <Button type="submit" className="w-100 rounded-pill btn-primary">
+      <Button
+        type="submit"
+        className="w-100 rounded-pill btn-primary"
+        onClick={() => navigate("/search")}
+      >
         Register
       </Button>
     </Form>
   );
 };
 
-export default RegistrationForm
+export default RegistrationForm;

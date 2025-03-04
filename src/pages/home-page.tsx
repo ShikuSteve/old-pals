@@ -13,12 +13,16 @@ import linkedin from "../assets/linkedin.png";
 import phone from "../assets/phone.png";
 import x from "../assets/x.png";
 import { FAQ } from "./faq";
+import { useNavigate } from "react-router-dom";
 
 export const HomePage = () => {
   const scrollToSection = (id: string) => {
     document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
   };
-  // const navigate = useNavigation();
+  const navigate = useNavigate();
+  const login = () => {
+    navigate("/login");
+  };
   return (
     <div
       style={{
@@ -124,11 +128,13 @@ export const HomePage = () => {
         <div className="mt-4">
           <button
             className="btn btn-primary btn-hover-pop me-5 p-4 "
-            // onClick={() => navigate("/login")}
+            onClick={login}
           >
             Sign Up
           </button>
-          <button className="btn btn-success btn-hover-pop p-4">Login</button>
+          <button className="btn btn-success btn-hover-pop p-4" onClick={login}>
+            Login
+          </button>
         </div>
       </main>
 

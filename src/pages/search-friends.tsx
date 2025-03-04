@@ -1,7 +1,8 @@
-import { Button, Container, Form, Spinner, Card } from "react-bootstrap";
+import { Button, Container, Form, Card } from "react-bootstrap";
 import "../css/search.css";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import pic5 from "../assets/pic5.jpeg";
+import Loader from "../components/loader";
 
 interface Friend {
   id: number;
@@ -68,6 +69,15 @@ export const SearchFriends = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [results, setResults] = useState<Friend[]>([]);
   const [loading, setLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsLoading(false);
+    }, 1000);
+
+    return () => clearTimeout(timer);
+  }, []);
 
   const handleSearch = () => {
     setLoading(true);
@@ -82,6 +92,9 @@ export const SearchFriends = () => {
       setLoading(false);
     }, 1000);
   };
+  if (isLoading) {
+    return <Loader />;
+  }
   return (
     <Container
       fluid
@@ -110,11 +123,7 @@ export const SearchFriends = () => {
           onChange={(e) => setSearchQuery(e.target.value)}
         />
         <Button variant="primary" className="ms-2" onClick={handleSearch}>
-          {loading ? (
-            <Spinner as="span" animation="border" size="sm" />
-          ) : (
-            "Search"
-          )}
+          {loading ? <Loader /> : "Search"}
         </Button>
       </Form>
       <div
