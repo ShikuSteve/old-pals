@@ -2,6 +2,8 @@ import React from "react";
 import { Button, Form, InputGroup } from "react-bootstrap";
 import { PasswordField } from "./password-field";
 import { useNavigate } from "react-router-dom";
+import { useDispatch } from "react-redux";
+import { setIsLoggedIn, setUser } from "../store/slice/auth-slice";
 
 type LoginFormProps = {
   onRegisterClick: () => void;
@@ -12,6 +14,18 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onRegisterClick }) => {
 
   function handleLogin() {
     // Perform your login validation, API calls, etc. here.
+    const dummyUser = {
+      accessToken: "dummy-access-token",
+      refreshToken: "dummy-refresh-token",
+      email: "user@example.com",
+      fullName: "John Doe",
+      phoneNumber: "1234567890",
+      imageUrl: "https://example.com/avatar.jpg",
+      refreshTknExpTime: Date.now() + 3600 * 1000,
+      accessTknExpTime: Date.now() + 1800 * 1000,
+    };
+    dispatch(setUser(dummyUser));
+    dispatch(setIsLoggedIn(true));
     // If successful, navigate to the ProfilePage:
     navigate("/profile");
   }

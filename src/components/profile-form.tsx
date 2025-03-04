@@ -1,5 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { Form, Button, Row, Col, FloatingLabel } from "react-bootstrap";
+import { useSelector } from "react-redux";
+import { RootState } from "../store";
+import { useNavigate } from "react-router-dom";
 
 import { useNavigate } from "react-router-dom";
 
@@ -57,7 +60,19 @@ const RegistrationForm: React.FC = () => {
   const [hometownSuggestions, setHometownSuggestions] = useState<string[]>([]);
   const [allCities, setAllCities] = useState<string[]>([]);
 
+  // Retrieve user info from Redux store.
+  const storedUser = useSelector((state: RootState) => state.auth.user);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (storedUser) {
+      setFormData((prev) => ({
+        ...prev,
+        fullName: storedUser.fullName,
+        email: storedUser.email,
+      }));
+    }
+  }, [storedUser]);
 
   // Fetch country suggestions from the Rest Countries API and store both name and code.
   useEffect(() => {
@@ -207,6 +222,7 @@ const RegistrationForm: React.FC = () => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     console.log("Form Data Submitted:", formData);
+    navigate("/chat");
   };
 
   return (

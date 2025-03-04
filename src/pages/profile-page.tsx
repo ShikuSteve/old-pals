@@ -6,7 +6,7 @@ import Loader from "../components/loader";
 const backgroundStyle: React.CSSProperties = {
   width: "100vw",
   height: "100vh",
-  backgroundColor: "#f8f9fa", // removed extra quotes
+  backgroundColor: "#f8f9fa", 
 };
 
 export const ProfilePage: React.FC = () => {
