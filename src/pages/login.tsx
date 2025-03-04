@@ -17,7 +17,6 @@ const backgroundStyle: React.CSSProperties = {
   position: "relative",
 };
 
-
 const containerStyle: React.CSSProperties = {
   width: "750px",
   height: "500px",
@@ -40,7 +39,7 @@ export const Login: React.FC = () => {
   useEffect(() => {
     const timer = setTimeout(() => {
       setIsLoading(false);
-    }, 2000);
+    }, 1000);
 
     return () => clearTimeout(timer);
   }, []);
@@ -57,13 +56,18 @@ export const Login: React.FC = () => {
     transform: isActive ? "translateX(-100%)" : "translateX(0)",
   };
   if (isLoading) {
-    return <Loader />; 
+    return <Loader />;
   }
 
-
   return (
-    <div style={backgroundStyle} className="d-flex justify-content-center align-items-center">
-      <div className="position-relative overflow-hidden bg-white shadow-lg rounded-3" style={containerStyle}>
+    <div
+      style={backgroundStyle}
+      className="d-flex justify-content-center align-items-center"
+    >
+      <div
+        className="position-relative overflow-hidden bg-white shadow-lg rounded-3"
+        style={containerStyle}
+      >
         <div style={panelLeftStyle}>
           {isActive ? (
             <OverlayPanel
