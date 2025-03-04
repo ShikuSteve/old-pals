@@ -1,0 +1,19 @@
+.hover-card {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.hover-card:hover {
+  transform: scale(1.05);
+  box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.2);
+}
+
+.hover-card:active {
+  transform: scale(0.98);
+  box-shadow: 0px 2px 5px rgba(0, 0, 0, 0.15);
+}
+
+.footer {
+  animation: bounce 1s infinite ease-in-out;
+  transform: scale(1.5); /* Enlarges the hovered icon */
+  filter: brightness(1.2);
+}

@@ -1,0 +1,47 @@
+/* FAQ Section Styling */
+.faq-container {
+  max-width: 100vw;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
+
+.faq-accordion .accordion-item {
+  border-radius: 10px;
+  overflow: hidden;
+  margin-bottom: 10px;
+  align-self: center;
+  width: 70vw;
+  transition: transform 0.3s ease-in-out;
+}
+
+.faq-accordion .accordion-item:hover {
+  transform: scale(1.02);
+}
+
+.faq-accordion .accordion-header {
+  background: #405064;
+  color: white;
+  font-weight: bold;
+  border-radius: 10px;
+}
+
+.faq-accordion .accordion-button {
+  background: #4e4f50;
+  color: white;
+}
+
+.faq-accordion .accordion-button:not(.collapsed) {
+  background: #46525e;
+  color: rgb(255, 255, 255);
+}
+
+.faq-accordion .accordion-body {
+  background: #9bd9e3;
+  color: #333;
+  border-radius: 0 0 10px 10px;
+  padding: 15px;
+  align-self: center;
+}

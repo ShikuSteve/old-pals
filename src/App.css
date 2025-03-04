@@ -1,11 +1,10 @@
-#root {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
-  text-align: center;
-}
+/* #root { */
+/* max-width: 1280px; */
+/* margin: 0 auto; */
+/* background: linear-gradient(to top right, rgb(95, 95, 97), rgb(44, 46, 49)); */
+/* } */
 
-.logo {
+/* .logo {
   height: 6em;
   padding: 1.5em;
   will-change: filter;
@@ -39,4 +38,4 @@
 
 .read-the-docs {
   color: #888;
-}
+} */

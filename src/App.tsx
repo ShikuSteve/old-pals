@@ -8,6 +8,8 @@ import {
   ProfilePage,
   SignIn,
 } from "./pages";
+import { SearchFriends } from "./pages/search-friends";
+import { UserDetails } from "./pages/user-details";
 
 function App() {
   return (
@@ -19,6 +21,8 @@ function App() {
         <Route path="/profile" element={<ProfilePage />} />
         <Route path="/not-found" element={<NotFound />} />
         <Route path="/error" element={<ErrorPage />} />
+        <Route path="/search" element={<SearchFriends />} />
+        <Route path="/user-details" element={<UserDetails />} />
       </Routes>
     </Router>
   );

@@ -1,0 +1,88 @@
+@keyframes bounce {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+.bouncy {
+  animation: bounce 1s infinite ease-in-out;
+}
+.moving-images {
+  display: flex;
+  gap: 10px;
+  white-space: nowrap; /* Prevents wrapping */
+  overflow: hidden;
+  position: relative;
+  width: 100%;
+}
+
+.moving-images img {
+  animation: move-left 5s linear infinite, bounce 1s infinite ease-in-out;
+}
+@keyframes moveBounce {
+  0% {
+    transform: translateX(0) translateY(0);
+  }
+  50% {
+    transform: translateX(-50vw) translateY(-10px); /* Moves left & bounces */
+  }
+  100% {
+    transform: translateX(-100vw) translateY(0); /* Fully moves left */
+  }
+}
+
+.bouncy-moving {
+  animation: moveBounce 20s linear infinite;
+  display: inline-block; /* Keeps images inline */
+}
+
+/* Moving from right to left */
+@keyframes move-left {
+  0% {
+    transform: translateX(100vw);
+  }
+  100% {
+    transform: translateX(-100%);
+  }
+}
+
+/* Bouncing Effect
+  @keyframes bounce {
+    0%, 100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-10px);
+    }
+  } */
+
+.footer {
+  animation: bounce 1s infinite ease-in-out;
+  transform: scale(1.5); /* Enlarges the hovered icon */
+  filter: brightness(1.2);
+}
+.btn-hover-pop {
+  transition: transform 0.3s ease-in-out;
+}
+
+.btn-hover-pop:hover {
+  transform: scale(1.1); /* Noticeable enlargement */
+}
+
+.card-hover-pop {
+  transition: transform 0.3s ease-in-out;
+}
+.card-hover-pop:hover {
+  transform: scale(1.1); /* Noticeable enlargement */
+}
+
+.img {
+  mix-blend-mode: darken; /* Removes white background */
+}
+
+.img-dark {
+  mix-blend-mode: multiply; /* Works best on white backgrounds */
+}
