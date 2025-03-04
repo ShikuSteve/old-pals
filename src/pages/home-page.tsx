@@ -28,17 +28,12 @@ export const HomePage = () => {
       style={{
         background:
           "linear-gradient(to top right, rgb(95, 95, 97), rgb(44, 46, 49))",
-        // minHeight: "100vh",
-        // width: "100vw", // Ensures full width
-        // display: "flex",
-        // flexDirection: "column",
-        // maxWidth: "1280px",
       }}
     >
       {/* Header Section */}
       <header
         style={{
-          background: "linear-gradient(to left,rgb(51, 49, 54), #2575fc)",
+          background: "linear-gradient(to left, rgb(51, 49, 54), #2575fc)",
           boxShadow: "0px 4px 6px rgba(0, 0, 0, 0.1)",
           padding: "1rem 2rem",
           display: "flex",
@@ -50,47 +45,49 @@ export const HomePage = () => {
           zIndex: 1000,
         }}
       >
-        <h1 className="h3">
+        <div style={{ display: "flex", alignItems: "center" }}>
           <img
             src="../public/oldpal2.png"
             alt="Reconnect"
-            width="150"
-            height="150"
+            width="100"
+            height="100"
             className="rounded-circle me-2 bouncy"
           />
-          OldPal
-        </h1>
+          <h1 className="h3 text-white" style={{ marginLeft: "10px" }}>
+            OldPal
+          </h1>
+        </div>
 
-        <nav>
+        <nav style={{ display: "flex", gap: "20px" }}>
           <a
-            style={{ fontSize: "30px" }}
+            style={{ fontSize: "24px" }}
             onClick={() => scrollToSection("contact")}
             href="#contact"
-            className="text-white mx-3 text-decoration-none"
+            className="text-white text-decoration-none"
           >
             Contact
           </a>
           <a
-            style={{ fontSize: "30px" }}
+            style={{ fontSize: "24px" }}
             onClick={() => scrollToSection("about")}
             href="#about"
-            className="text-white mx-3 text-decoration-none"
+            className="text-white text-decoration-none"
           >
             About
           </a>
           <a
-            style={{ fontSize: "30px" }}
+            style={{ fontSize: "24px" }}
             onClick={() => scrollToSection("features")}
             href="#features"
-            className="text-white mx-3 text-decoration-none"
+            className="text-white text-decoration-none"
           >
             Features
           </a>
           <a
-            style={{ fontSize: "30px" }}
+            style={{ fontSize: "24px" }}
             onClick={() => scrollToSection("faqs")}
             href="#faqs"
-            className="text-white mx-3 text-decoration-none"
+            className="text-white text-decoration-none"
           >
             FAQs
           </a>

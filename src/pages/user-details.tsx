@@ -36,7 +36,8 @@ export const UserDetails = () => {
       className="m-0 d-flex flex-column scrollable-container "
       style={{
         backgroundColor: "#76abdf",
-        width: "100vw",
+        // width: "100vw",
+        flex: 1,
         minHeight: "100vh",
         padding: "30px",
         overflow: "auto",

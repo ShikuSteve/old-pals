@@ -100,8 +100,9 @@ export const SearchFriends = () => {
       fluid
       className="p-0 m-0 d-flex flex-column align-items-center justify-content-center"
       style={{
+        alignSelf: "center",
         background: "radial-gradient(circle, #070c12, #383939, #292a2b)",
-        width: "100vw",
+        // width: "100vw",
         minHeight: "100vh",
         color: "white",
         padding: "30px",
