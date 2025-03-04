@@ -15,25 +15,6 @@ const backgroundStyle: React.CSSProperties = {
   backgroundColor: "#f0f2f5",
 };
 
-// type TextMessage = {
-//   type: "text";
-//   content: string;
-//   sentByMe: boolean;
-// };
-
-// type ImageMessage = {
-//   type: "image";
-//   content: string; // image data URL
-//   caption?: string;
-//   sentByMe: boolean;
-// };
-
-// type FileMessage = {
-//   type: "file";
-//   content: File;
-//   caption?: string;
-//   sentByMe: boolean;
-// };
 
 type BaseMessage = {
   id: string;
@@ -643,93 +624,169 @@ useEffect(() => {
           </div>
 
           
-          <div style={{ padding: "10px", backgroundColor: "#f0f0f0", borderTop: "1px solid #ddd", position: "absolute", bottom: 0, width: "100%" }}>
-          
-          {previewFile && (
-              <div style={{ marginBottom: "10px", textAlign: "center" }}>
-                {previewFileType === "image" && (
-                  <img src={URL.createObjectURL(previewFile)} alt="Preview" style={{ maxWidth: "100%", borderRadius: "10px" }} />
-                )}
-                {previewFileType === "video" && (
-                  <video controls src={URL.createObjectURL(previewFile)} style={{ maxWidth: "100%", borderRadius: "10px" }} />
-                )}
-                {previewFileType === "document" && (
-                  <div style={{ padding: "10px", backgroundColor: "#ffffff", borderRadius: "10px" }}>
-                    <FileEarmark size={48} />
-                    <p>{previewFile.name}</p>
-                  </div>
-                )}
-                 <Button
-      variant="close"
-      size="sm"
-      onClick={closePreview}
-      style={{ position: "absolute", top: "5px", right: "5px" }}
+          <div
+  style={{
+    padding: "10px",
+    backgroundColor: "#f0f0f0",
+    borderTop: "1px solid #ddd",
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    width: "100%",
+    maxWidth: "100%",
+    overflow: "visible", // Allow the attachment menu to overflow
+  }}
+>
+  {/* Preview File Section */}
+  {previewFile && (
+    <div
+      style={{
+        marginBottom: "10px",
+        textAlign: "center",
+        position: "relative",
+        maxHeight: "200px",
+        overflowY: "auto",
+      }}
     >
-     
-    </Button>
-            
-              </div>
-            )}
-            <Form>
-              <Form.Group className="d-flex align-items-center">
-                <Button variant="light" style={{ borderRadius: "50%", marginRight: "10px" }} onClick={() => setShowAttachmentMenu(!showAttachmentMenu)}>
-                  <Plus size={20} />
-                </Button>
-                {showAttachmentMenu && (
-                  <div
-                    ref={attachmentMenuRef}
-                    style={{
-                      position: "absolute",
-                      bottom: "60px",
-                      left: "10px",
-                      backgroundColor: "#ffffff",
-                      borderRadius: "10px",
-                      boxShadow: "0 2px 5px rgba(0, 0, 0, 0.1)",
-                      padding: "10px",
-                      width: "200px"
-                    }}
-                  >
-                    <div style={{ display: "flex", alignItems: "center", padding: "8px", cursor: "pointer" }} onClick={() => handleAttachmentClick("document")}>
-                      <FileEarmark size={18} style={{ marginRight: "10px" }} />
-                      <span>Document</span>
-                    </div>
-                    <div style={{ display: "flex", alignItems: "center", padding: "8px", cursor: "pointer" }} onClick={() => handleAttachmentClick("image")}>
-                      <Image size={18} style={{ marginRight: "10px" }} />
-                      <span>Photos & Videos</span>
-                    </div>
-                    <div style={{ display: "flex", alignItems: "center", padding: "8px", cursor: "pointer" }} onClick={() => handleAttachmentClick("camera")}>
-                      <Camera size={18} style={{ marginRight: "10px" }} />
-                      <span>Camera</span>
-                    </div>
-                  </div>
-                )}
-                <Button variant="light" style={{ borderRadius: "50%", marginRight: "10px" }} onClick={() => setShowEmojiPicker(!showEmojiPicker)}>
-                  <EmojiSmile size={20} />
-                </Button>
-                <Form.Control
-                  type="text"
-                  placeholder="Type a message"
-                  value={message}
-                  onChange={handleInputChange}
-                  style={{ flex: 1, borderRadius: "20px", border: "none", marginRight: "10px" }}
-                />
-                {(isTyping || previewFile || editedImage) ? (
-                  <Button variant="success" onClick={handleSendMessage} style={{ borderRadius: "50%" }}>
-                    <Send size={20} />
-                  </Button>
-                ) : (
-                  <Button variant="light" style={{ borderRadius: "50%" }}>
-                    <Mic size={20} />
-                  </Button>
-                )}
-              </Form.Group>
-            </Form>
-            {showEmojiPicker && (
-              <div ref={emojiPickerRef} style={{ position: "absolute", bottom: "60px", right: "10px" }}>
-                <EmojiPicker onEmojiClick={handleEmojiClick} />
-              </div>
-            )}
+      {previewFileType === "image" && (
+        <img
+          src={URL.createObjectURL(previewFile)}
+          alt="Preview"
+          style={{ maxWidth: "100%", borderRadius: "10px" }}
+        />
+      )}
+      {previewFileType === "video" && (
+        <video
+          controls
+          src={URL.createObjectURL(previewFile)}
+          style={{ maxWidth: "100%", borderRadius: "10px" }}
+        />
+      )}
+      {previewFileType === "document" && (
+        <div
+          style={{
+            padding: "10px",
+            backgroundColor: "#ffffff",
+            borderRadius: "10px",
+            maxWidth: "90%",
+            margin: "0 auto",
+          }}
+        >
+          <FileEarmark size={48} />
+          <p>{previewFile.name}</p>
+        </div>
+      )}
+      {/* Close Button */}
+      <Button
+        variant="close"
+        size="sm"
+        onClick={closePreview}
+        style={{
+          position: "absolute",
+          top: "10px",
+          right: "10px",
+          zIndex: 1000,
+          backgroundColor: "rgba(255, 255, 255, 0.8)",
+          borderRadius: "50%",
+          padding: "5px",
+        }}
+      >
+        ×
+      </Button>
+    </div>
+  )}
+
+  {/* Input Field and Attachment Menu */}
+  <Form>
+    <Form.Group className="d-flex align-items-center">
+      {/* Attachment Button */}
+      <Button
+        variant="light"
+        style={{ borderRadius: "50%", marginRight: "10px" }}
+        onClick={() => setShowAttachmentMenu(!showAttachmentMenu)}
+      >
+        <Plus size={20} />
+      </Button>
+
+      {/* Attachment Menu */}
+      {showAttachmentMenu && (
+        <div
+          ref={attachmentMenuRef}
+          style={{
+            position: "absolute",
+            bottom: "60px", // Adjust this value if needed
+            left: "10px",
+            backgroundColor: "#ffffff",
+            borderRadius: "10px",
+            boxShadow: "0 2px 5px rgba(0, 0, 0, 0.1)",
+            padding: "10px",
+            width: "200px",
+            zIndex: 1000, // Ensure the menu is above other elements
+          }}
+        >
+          <div
+            style={{ display: "flex", alignItems: "center", padding: "8px", cursor: "pointer" }}
+            onClick={() => handleAttachmentClick("document")}
+          >
+            <FileEarmark size={18} style={{ marginRight: "10px" }} />
+            <span>Document</span>
           </div>
+          <div
+            style={{ display: "flex", alignItems: "center", padding: "8px", cursor: "pointer" }}
+            onClick={() => handleAttachmentClick("image")}
+          >
+            <Image size={18} style={{ marginRight: "10px" }} />
+            <span>Photos & Videos</span>
+          </div>
+          <div
+            style={{ display: "flex", alignItems: "center", padding: "8px", cursor: "pointer" }}
+            onClick={() => handleAttachmentClick("camera")}
+          >
+            <Camera size={18} style={{ marginRight: "10px" }} />
+            <span>Camera</span>
+          </div>
+        </div>
+      )}
+
+      {/* Emoji Button */}
+      <Button
+        variant="light"
+        style={{ borderRadius: "50%", marginRight: "10px" }}
+        onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+      >
+        <EmojiSmile size={20} />
+      </Button>
+
+      {/* Message Input */}
+      <Form.Control
+        type="text"
+        placeholder="Type a message"
+        value={message}
+        onChange={handleInputChange}
+        style={{ flex: 1, borderRadius: "20px", border: "none", marginRight: "10px" }}
+      />
+
+      {/* Send/Record Button */}
+      {(isTyping || previewFile || editedImage) ? (
+        <Button variant="success" onClick={handleSendMessage} style={{ borderRadius: "50%" }}>
+          <Send size={20} />
+        </Button>
+      ) : (
+        <Button variant="light" style={{ borderRadius: "50%" }}>
+          <Mic size={20} />
+        </Button>
+      )}
+    </Form.Group>
+  </Form>
+
+  {/* Emoji Picker */}
+  {showEmojiPicker && (
+    <div ref={emojiPickerRef} style={{ position: "absolute", bottom: "60px", right: "10px" }}>
+      <EmojiPicker onEmojiClick={handleEmojiClick} />
+    </div>
+  )}
+</div>
         </Col>
       </Row>
       <input type="file" ref={fileInputRef} style={{ display: "none" }} onChange={handleFileInputChange} />
