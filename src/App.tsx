@@ -34,6 +34,7 @@ const Layout = () => {
           <Route path="/error" element={<ErrorPage />} />
           <Route path="/search" element={<SearchFriends />} />
           <Route path="/user-details" element={<UserDetails />} />
+          <Route path="/chat" element={<MessagingPage />} />
         </Routes>
       </div>
     </div>
