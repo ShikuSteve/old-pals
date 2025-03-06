@@ -5,6 +5,7 @@ import {
   signInWithEmailAndPassword,
   signOut,
   updateProfile,
+  User,
 } from "firebase/auth";
 import { auth } from "../../firebase";
 
@@ -44,15 +45,27 @@ export const logout = async () => {
 export const deleteAccount = async () => {
   try {
     const auth = getAuth();
-    const user = auth.currentUser;
+    const user: User | null = auth.currentUser;
 
-    if (user) {
-      await deleteUser(user);
-      console.log("User account deleted successfully");
-    } else {
-      console.log("No user signed in");
+    if (!user) {
+      console.log("No user signed in.");
+      return;
     }
-  } catch (err) {
-    console.log("Error deleting account", err);
+
+    await deleteUser(user);
+    console.log("User account deleted successfully!");
+
+    // Sign out the user after successful deletion
+    await auth.signOut();
+    console.log("User signed out successfully.");
+
+    // Redirect to login page or show a success message if needed
+  } catch (error) {
+    console.error(`Error deleting user: ${error}`);
+
+    // if (error.code === "auth/requires-recent-login") {
+    //   console.error("Re-authentication required before deletion.");
+    //   // You can prompt the user to re-authenticate here
+    // }
   }
 };

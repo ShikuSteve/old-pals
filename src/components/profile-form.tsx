@@ -4,7 +4,7 @@ import { useSelector } from "react-redux";
 import { RootState } from "../store";
 import { useNavigate } from "react-router-dom";
 import { saveAdditionalUserInfo } from "../backend/services/user-service";
-import { cloudName } from "../backend/services/upload-image";
+import { uploadImage } from "../utils/upload-image";
 
 interface FormData {
   fullName: string;
@@ -60,9 +60,9 @@ const RegistrationForm: React.FC = () => {
   const [hometownSuggestions, setHometownSuggestions] = useState<string[]>([]);
   const [allCities, setAllCities] = useState<string[]>([]);
 
-   // Retrieve user info from Redux store.
-   const storedUser = useSelector((state: RootState) => state.auth.user);
-  const navigate= useNavigate()
+  // Retrieve user info from Redux store.
+  const storedUser = useSelector((state: RootState) => state.auth.user);
+  const navigate = useNavigate();
 
   useEffect(() => {
     if (storedUser) {
@@ -219,30 +219,7 @@ const RegistrationForm: React.FC = () => {
     }
   };
   console.log(formData.profilePicture, "picture");
-  const uploadImage = async (
-    file: File
-  ): Promise<string | null | undefined> => {
-    if (!file) return null;
 
-    const data = new FormData();
-    data.append("file", file);
-    data.append("upload_preset", "OldPals");
-    data.append("cloud_name", cloudName);
-
-    try {
-      const response = await fetch(
-        `      https://api.cloudinary.com/v1_1/${cloudName}/image/upload`,
-        { method: "POST", body: data }
-      );
-
-      const result = await response.json();
-      // console.log("Upload success:", result);
-      return result.secure_url; // Cloudinary URL of the uploaded image
-    } catch (err) {
-      console.log(err);
-      return;
-    }
-  };
   const handleSubmit = async (e: React.FormEvent) => {
     try {
       e.preventDefault();

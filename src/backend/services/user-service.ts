@@ -1,5 +1,19 @@
-import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
+import {
+  addDoc,
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  onSnapshot,
+  orderBy,
+  query,
+  serverTimestamp,
+  setDoc,
+  updateDoc,
+} from "firebase/firestore";
 import { auth, db } from "../../firebase";
+import { User } from "../../pages/search-friends";
+import { updateProfile } from "firebase/auth";
 
 interface props {
   school: string;
@@ -55,6 +69,32 @@ export const saveAdditionalUserInfo = async (data: props) => {
     console.log(err);
   }
 };
+export const updateUserInfo = async (updatedData: Partial<User>) => {
+  try {
+    const user = auth.currentUser;
+
+    if (!user) {
+      console.error("No user found");
+      return;
+    }
+
+    const userRef = doc(db, "users", user.uid);
+
+    // Update Firestore
+    await updateDoc(userRef, { ...updatedData });
+
+    console.log("User details updated successfully in Firestore");
+
+    // If 'name' is provided, update Firebase Authentication
+    if (updatedData.name) {
+      await updateProfile(user, { displayName: updatedData.name });
+      await user.reload(); // ✅ Refresh user to get updated displayName
+      console.log("User display name updated in Firebase Auth");
+    }
+  } catch (err) {
+    console.error("Error updating user info:", err);
+  }
+};
 
 export const getUser = async (userId: string) => {
   try {
@@ -74,7 +114,154 @@ export const getUser = async (userId: string) => {
   }
 };
 
-export const getUsers = async () => {
-  const users = doc(db, "users");
-  return await getDoc(users);
+export const fetchUsers = async (): Promise<User[]> => {
+  const userRef = collection(db, "users");
+  const userIdCurrent = auth.currentUser?.uid; // Extract UID as string or undefined
+
+  const snapshot = await getDocs(userRef);
+
+  return snapshot.docs
+    .map((doc) => ({ id: doc.id, ...doc.data() } as User))
+    .filter((user) => user.id !== userIdCurrent);
+};
+
+export const addFriend = async (friendId: string) => {
+  try {
+    const user = auth.currentUser;
+
+    if (!user) {
+      console.log("No user signed in");
+      return;
+    }
+
+    const userId = user.uid;
+
+    const friendRef = doc(db, `users/${userId}/friends`, friendId);
+
+    //store friend info
+
+    const result = await setDoc(friendRef, { friendId });
+
+    console.log(result, "result from adding a friend");
+  } catch (err) {
+    console.log(err, "error");
+  }
+};
+
+export const checkIfFriend = async (friendId: string) => {
+  try {
+    const user = auth.currentUser;
+    if (!user) {
+      console.error("User not authenticated");
+      return false;
+    }
+
+    const friendRef = doc(db, `users/${user.uid}/friends/${friendId}`);
+    const friendDoc = await getDoc(friendRef);
+
+    return friendDoc.exists(); // ✅ Returns true if friend exists
+  } catch (error) {
+    console.error("Error checking friend status", error);
+    return false;
+  }
+};
+
+export const createChat = async (friendId: string) => {
+  if (!auth.currentUser) return;
+
+  const currentUserId = auth.currentUser.uid;
+
+  //generate a unique chat ID using both user IDs
+
+  const chatId = [currentUserId, friendId].sort().join("_");
+
+  const chatRef = doc(db, "chats", chatId);
+  const chatSnap = await getDoc(chatRef);
+
+  if (!chatSnap.exists()) {
+    await setDoc(chatRef, {
+      users: [currentUserId, friendId],
+      lastMessage: "",
+      timestamp: new Date(),
+    });
+  }
+  return chatId;
+};
+
+//sending a message
+
+export const sendMessage = async (
+  chatId: string,
+  message: string,
+  receiverId: string
+) => {
+  if (!auth.currentUser) return;
+
+  const senderId = auth.currentUser.uid;
+
+  const messageRef = collection(db, "chats", chatId, "messages");
+
+  await addDoc(messageRef, {
+    senderId,
+    receiverId,
+    message,
+    timestamp: serverTimestamp(),
+  });
+};
+
+//retreiving messages from firebase
+interface Message {
+  id: string;
+  senderId: string;
+  receiverId: string;
+  message: string;
+  timestamp: Date;
+}
+export const listenForMessages = (
+  chatId: string,
+  callback: (messages: Message[]) => void
+) => {
+  const messagesRef = collection(db, "chats", chatId, "messages"); // Use db instead of Firestore
+  const q = query(messagesRef, orderBy("timestamp", "asc"));
+
+  return onSnapshot(q, (snapshot) => {
+    const messages: Message[] = snapshot.docs.map((doc) => ({
+      id: doc.id,
+      senderId: doc.data().senderId,
+      receiverId: doc.data().receiverId,
+      message: doc.data().message,
+      timestamp: doc.data().timestamp?.toDate() ?? new Date(), // Convert Firestore timestamp
+    }));
+    callback(messages);
+  });
+};
+
+export const fetchFriends = async () => {
+  try {
+    const userId = auth.currentUser?.uid;
+    if (!userId) return [];
+
+    //fetch friend IDs
+    const friendsRef = collection(db, "users", userId, "friends");
+
+    const friendSnapshot = await getDocs(friendsRef);
+
+    const friendIds = friendSnapshot.docs.map((doc) => doc.id);
+
+    //fetch full user data for each friend
+    const friendsData = await Promise.all(
+      friendIds.map(async (friendId) => {
+        const friendDocRef = doc(db, "users", friendId);
+        const friendDoc = await getDoc(friendDocRef);
+        return friendDoc.exists()
+          ? { id: friendId, ...friendDoc.data() }
+          : null;
+      })
+    );
+
+    return friendsData.filter(Boolean) as User[];
+  } catch (err) {
+    console.log(err, "errorrrr");
+    return [];
+  }
 };
