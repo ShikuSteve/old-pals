@@ -1,8 +1,13 @@
 import {
+  addDoc,
   collection,
   doc,
   getDoc,
   getDocs,
+  onSnapshot,
+  orderBy,
+  query,
+  serverTimestamp,
   setDoc,
   updateDoc,
 } from "firebase/firestore";
@@ -132,4 +137,74 @@ export const checkIfFriend = async (friendId: string) => {
     console.error("Error checking friend status", error);
     return false;
   }
+};
+
+export const createChat = async (friendId: string) => {
+  if (!auth.currentUser) return;
+
+  const currentUserId = auth.currentUser.uid;
+
+  //generate a unique chat ID using both user IDs
+
+  const chatId = [currentUserId, friendId].sort().join("_");
+
+  const chatRef = doc(db, "chats", chatId);
+  const chatSnap = await getDoc(chatRef);
+
+  if (!chatSnap.exists()) {
+    await setDoc(chatRef, {
+      users: [currentUserId, friendId],
+      lastMessage: "",
+      timestamp: new Date(),
+    });
+  }
+  return chatId;
+};
+
+//sending a message
+
+export const sendMessage = async (
+  chatId: string,
+  message: string,
+  receiverId: string
+) => {
+  if (!auth.currentUser) return;
+
+  const senderId = auth.currentUser.uid;
+
+  const messageRef = collection(db, "chats", chatId, "messages");
+
+  await addDoc(messageRef, {
+    senderId,
+    receiverId,
+    message,
+    timestamp: serverTimestamp(),
+  });
+};
+
+//retreiving messages from firebase
+interface Message {
+  id: string;
+  senderId: string;
+  receiverId: string;
+  message: string;
+  timestamp: Date;
+}
+export const listenForMessages = (
+  chatId: string,
+  callback: (messages: Message[]) => void
+) => {
+  const messagesRef = collection(db, "chats", chatId, "messages"); // Use db instead of Firestore
+  const q = query(messagesRef, orderBy("timestamp", "asc"));
+
+  return onSnapshot(q, (snapshot) => {
+    const messages: Message[] = snapshot.docs.map((doc) => ({
+      id: doc.id,
+      senderId: doc.data().senderId,
+      receiverId: doc.data().receiverId,
+      message: doc.data().message,
+      timestamp: doc.data().timestamp?.toDate() ?? new Date(), // Convert Firestore timestamp
+    }));
+    callback(messages);
+  });
 };
