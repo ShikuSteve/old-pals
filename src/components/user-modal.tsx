@@ -82,7 +82,7 @@ export const UserModal = (data: Props) => {
       </Modal>
 
       {/* Loading Modal */}
-      <Modal show={loading} centered backdrop="static">
+      <Modal className="custom-modal" show={loading} centered backdrop="static">
         <Modal.Body className="text-center">
           <Spinner animation="border" role="status" />
           <p>Adding {user?.name} to your friends list...</p>
@@ -90,7 +90,12 @@ export const UserModal = (data: Props) => {
       </Modal>
 
       {/* Success Modal */}
-      <Modal show={successModal} onHide={() => setSuccessModal(false)} centered>
+      <Modal
+        className="custom-modal"
+        show={successModal}
+        onHide={() => setSuccessModal(false)}
+        centered
+      >
         <Modal.Body className="text-center">
           <p>You can now go to the chats section to chat with {user?.name}!</p>
           <Button variant="success" onClick={() => setSuccessModal(false)}>
