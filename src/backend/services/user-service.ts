@@ -208,3 +208,33 @@ export const listenForMessages = (
     callback(messages);
   });
 };
+
+export const fetchFriends = async () => {
+  try {
+    const userId = auth.currentUser?.uid;
+    if (!userId) return [];
+
+    //fetch friend IDs
+    const friendsRef = collection(db, "users", userId, "friends");
+
+    const friendSnapshot = await getDocs(friendsRef);
+
+    const friendIds = friendSnapshot.docs.map((doc) => doc.id);
+
+    //fetch full user data for each friend
+    const friendsData = await Promise.all(
+      friendIds.map(async (friendId) => {
+        const friendDocRef = doc(db, "users", friendId);
+        const friendDoc = await getDoc(friendDocRef);
+        return friendDoc.exists()
+          ? { id: friendId, ...friendDoc.data() }
+          : null;
+      })
+    );
+
+    return friendsData.filter(Boolean) as User[];
+  } catch (err) {
+    console.log(err, "errorrrr");
+    return [];
+  }
+};
