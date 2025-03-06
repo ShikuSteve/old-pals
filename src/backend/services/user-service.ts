@@ -1,5 +1,13 @@
-import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
+import {
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  setDoc,
+  updateDoc,
+} from "firebase/firestore";
 import { auth, db } from "../../firebase";
+import { User } from "../../pages/search-friends";
 
 interface props {
   school: string;
@@ -74,7 +82,54 @@ export const getUser = async (userId: string) => {
   }
 };
 
-export const getUsers = async () => {
-  const users = doc(db, "users");
-  return await getDoc(users);
+export const fetchUsers = async (): Promise<User[]> => {
+  const userRef = collection(db, "users");
+  const userIdCurrent = auth.currentUser?.uid; // Extract UID as string or undefined
+
+  const snapshot = await getDocs(userRef);
+
+  return snapshot.docs
+    .map((doc) => ({ id: doc.id, ...doc.data() } as User))
+    .filter((user) => user.id !== userIdCurrent);
+};
+
+export const addFriend = async (friendId: string) => {
+  try {
+    const user = auth.currentUser;
+
+    if (!user) {
+      console.log("No user signed in");
+      return;
+    }
+
+    const userId = user.uid;
+
+    const friendRef = doc(db, `users/${userId}/friends`, friendId);
+
+    //store friend info
+
+    const result = await setDoc(friendRef, { friendId });
+
+    console.log(result, "result from adding a friend");
+  } catch (err) {
+    console.log(err, "error");
+  }
+};
+
+export const checkIfFriend = async (friendId: string) => {
+  try {
+    const user = auth.currentUser;
+    if (!user) {
+      console.error("User not authenticated");
+      return false;
+    }
+
+    const friendRef = doc(db, `users/${user.uid}/friends/${friendId}`);
+    const friendDoc = await getDoc(friendRef);
+
+    return friendDoc.exists(); // ✅ Returns true if friend exists
+  } catch (error) {
+    console.error("Error checking friend status", error);
+    return false;
+  }
 };

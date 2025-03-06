@@ -1,12 +1,15 @@
 import {
   createUserWithEmailAndPassword,
   deleteUser,
+  EmailAuthProvider,
   getAuth,
+  reauthenticateWithCredential,
   signInWithEmailAndPassword,
   signOut,
   updateProfile,
 } from "firebase/auth";
-import { auth } from "../../firebase";
+import { auth, db } from "../../firebase";
+import { deleteDoc, doc } from "firebase/firestore";
 
 export const signup = async (name: string, email: string, password: string) => {
   try {
@@ -41,18 +44,28 @@ export const logout = async () => {
   }
 };
 
-export const deleteAccount = async () => {
+export const deleteAccount = async (password: string) => {
   try {
     const auth = getAuth();
     const user = auth.currentUser;
 
-    if (user) {
-      await deleteUser(user);
-      console.log("User account deleted successfully");
-    } else {
+    if (!user) {
       console.log("No user signed in");
+      return;
     }
+
+    // Reauthenticate the user
+    const credential = EmailAuthProvider.credential(user.email!, password);
+    await reauthenticateWithCredential(user, credential);
+
+    // Delete Firestore document
+    await deleteDoc(doc(db, "users", user.uid));
+    console.log("User document deleted successfully");
+
+    // Delete user authentication record
+    await deleteUser(user);
+    console.log("User account deleted successfully");
   } catch (err) {
-    console.log("Error deleting account", err);
+    console.error("Error deleting account:", err);
   }
 };

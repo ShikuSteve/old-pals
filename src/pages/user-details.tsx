@@ -17,12 +17,23 @@ import { EditProfileModal } from "./edit-profile";
 import { auth } from "../firebase";
 import { getUser } from "../backend/services/user-service";
 import { DocumentData } from "firebase/firestore";
+import Loader from "../components/loader";
 
 export const UserDetails = () => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [editProfile, setEditProfile] = useState<boolean>(false);
   const [userInfo, setUserInfo] = useState<DocumentData | null>({});
+  const [isLoading, setIsLoading] = useState(true);
+
   const user = auth.currentUser;
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsLoading(false);
+    }, 600);
+
+    return () => clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
     const getUserFn = async () => {
@@ -48,6 +59,10 @@ export const UserDetails = () => {
       containerRef.current.scrollTop = containerRef.current.scrollHeight;
     }
   }, []);
+
+  if (isLoading) {
+    return <Loader />;
+  }
 
   const showEditModal = () => {
     setEditProfile(!editProfile);
@@ -76,7 +91,7 @@ export const UserDetails = () => {
         <Row className="align-items-center">
           <Col md={3} className="text-center">
             <img
-              src={`${userInfo?.imageUrl}`}
+              src={userInfo?.imageUrl}
               alt="Profile"
               className="rounded-circle img-fluid"
             />

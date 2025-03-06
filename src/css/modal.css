@@ -1,0 +1,12 @@
+.profile-img {
+  width: 250px;
+  height: 250px;
+  border-radius: 50%;
+  border: 3px solid rgb(60, 77, 108);
+  margin-bottom: 15px;
+  transition: transform 0.3s ease-in-out;
+}
+
+.profile-img:hover {
+  transform: scale(1.1);
+}

@@ -26,12 +26,12 @@ export const SideBar = () => {
     setShowNotification(true);
   };
 
-  const handleConfirm = () => {
+  const handleConfirm = (password: string) => {
     if (action === "Logging out") {
       logout(); // Call the logout function
       console.log("logged out");
     } else {
-      deleteAccount(); // Call delete function
+      deleteAccount(password); // Call delete function
       console.log("User account deleted");
     }
     setShowNotification(false);
