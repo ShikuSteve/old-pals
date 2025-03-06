@@ -13,6 +13,7 @@ export const SideBar = () => {
 
   const [showNotification, setShowNotification] = useState(false);
   const [action, setAction] = useState("");
+  const [loading, setLoading] = useState(false); // Loading state
 
   const navigate = useNavigate();
 
@@ -26,16 +27,24 @@ export const SideBar = () => {
     setShowNotification(true);
   };
 
-  const handleConfirm = (password: string) => {
-    if (action === "Logging out") {
-      logout(); // Call the logout function
-      console.log("logged out");
-    } else {
-      deleteAccount(password); // Call delete function
-      console.log("User account deleted");
+  const handleConfirm = async (password: string) => {
+    setLoading(true); // Start loading
+
+    try {
+      if (action === "Logging out") {
+        await logout();
+        console.log("logged out");
+      } else {
+        await deleteAccount(password);
+        console.log("User account deleted");
+      }
+      navigate("/");
+    } catch (error) {
+      console.error("Error:", error);
+    } finally {
+      setLoading(false); // Stop loading
+      setShowNotification(false);
     }
-    setShowNotification(false);
-    navigate("/"); // Navigate only after confirmation
   };
 
   return (
@@ -47,6 +56,7 @@ export const SideBar = () => {
           name={user?.displayName}
           setShowNotification={setShowNotification}
           showNotification={showNotification}
+          loading={loading} // Pass loading state
         />
       )}
       <h2 className="logo">{user?.displayName}</h2>
@@ -69,24 +79,23 @@ export const SideBar = () => {
             <span>Profile</span>
           </Link>
         </li>
-        {/* Changed <Link> to <button> to prevent unwanted navigation */}
         <li>
           <div
-            style={{ marginLeft: "0px", padding: "10px" }}
             className="sidebar-item"
             onClick={handleLogout}
+            style={{ padding: "10px" }}
           >
-            <FaSignOutAlt className="icon" />
+            <FaSignOutAlt className="icon" size={21} />
             <span>Logout</span>
           </div>
         </li>
         <li>
           <div
-            style={{ marginLeft: "0px", padding: "10px" }}
             className="sidebar-item"
             onClick={handleDelete}
+            style={{ padding: "10px" }}
           >
-            <BiTrash className="icon" />
+            <BiTrash className="icon" size={22} />
             <span>Delete account</span>
           </div>
         </li>

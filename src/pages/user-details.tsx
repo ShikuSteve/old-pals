@@ -42,21 +42,20 @@ export const UserDetails = () => {
   useEffect(() => {
     const getUserFn = async () => {
       if (!user || !user.uid) return;
+      setIsLoading(true); // Start loading when fetching user
 
       try {
         const userDetails = await getUser(user.uid);
         setUserInfo(userDetails);
-        console.log(
-          JSON.stringify(userDetails, null, 2),
-          "Fetched user details"
-        );
       } catch (error) {
         console.error("Error fetching user data:", error);
+      } finally {
+        setIsLoading(false); // Stop loader after fetching
       }
     };
 
     getUserFn();
-  }, [user]); // Runs only when `user` changes
+  }, [user, editProfile]); // Add `editProfile` dependency to refetch after closing the modal
 
   useEffect(() => {
     if (containerRef.current) {
@@ -230,8 +229,10 @@ export const UserDetails = () => {
       </Card>
       {editProfile && (
         <EditProfileModal
+          user={userInfo}
           editProfile={editProfile}
           setEditProfile={setEditProfile}
+          setIsLoading={setIsLoading}
         />
       )}
     </Container>

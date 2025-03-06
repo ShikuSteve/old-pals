@@ -1,15 +1,13 @@
 import {
   createUserWithEmailAndPassword,
   deleteUser,
-  EmailAuthProvider,
   getAuth,
-  reauthenticateWithCredential,
   signInWithEmailAndPassword,
   signOut,
   updateProfile,
+  User,
 } from "firebase/auth";
-import { auth, db } from "../../firebase";
-import { deleteDoc, doc } from "firebase/firestore";
+import { auth } from "../../firebase";
 
 export const signup = async (name: string, email: string, password: string) => {
   try {
@@ -44,28 +42,30 @@ export const logout = async () => {
   }
 };
 
-export const deleteAccount = async (password: string) => {
+export const deleteAccount = async () => {
   try {
     const auth = getAuth();
-    const user = auth.currentUser;
+    const user: User | null = auth.currentUser;
 
     if (!user) {
-      console.log("No user signed in");
+      console.log("No user signed in.");
       return;
     }
 
-    // Reauthenticate the user
-    const credential = EmailAuthProvider.credential(user.email!, password);
-    await reauthenticateWithCredential(user, credential);
-
-    // Delete Firestore document
-    await deleteDoc(doc(db, "users", user.uid));
-    console.log("User document deleted successfully");
-
-    // Delete user authentication record
     await deleteUser(user);
-    console.log("User account deleted successfully");
-  } catch (err) {
-    console.error("Error deleting account:", err);
+    console.log("User account deleted successfully!");
+
+    // Sign out the user after successful deletion
+    await auth.signOut();
+    console.log("User signed out successfully.");
+
+    // Redirect to login page or show a success message if needed
+  } catch (error) {
+    console.error(`Error deleting user: ${error}`);
+
+    // if (error.code === "auth/requires-recent-login") {
+    //   console.error("Re-authentication required before deletion.");
+    //   // You can prompt the user to re-authenticate here
+    // }
   }
 };

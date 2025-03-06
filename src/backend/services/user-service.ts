@@ -13,6 +13,7 @@ import {
 } from "firebase/firestore";
 import { auth, db } from "../../firebase";
 import { User } from "../../pages/search-friends";
+import { updateProfile } from "firebase/auth";
 
 interface props {
   school: string;
@@ -66,6 +67,32 @@ export const saveAdditionalUserInfo = async (data: props) => {
     return response;
   } catch (err) {
     console.log(err);
+  }
+};
+export const updateUserInfo = async (updatedData: Partial<User>) => {
+  try {
+    const user = auth.currentUser;
+
+    if (!user) {
+      console.error("No user found");
+      return;
+    }
+
+    const userRef = doc(db, "users", user.uid);
+
+    // Update Firestore
+    await updateDoc(userRef, { ...updatedData });
+
+    console.log("User details updated successfully in Firestore");
+
+    // If 'name' is provided, update Firebase Authentication
+    if (updatedData.name) {
+      await updateProfile(user, { displayName: updatedData.name });
+      await user.reload(); // ✅ Refresh user to get updated displayName
+      console.log("User display name updated in Firebase Auth");
+    }
+  } catch (err) {
+    console.error("Error updating user info:", err);
   }
 };
 
