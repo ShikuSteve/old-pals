@@ -60,9 +60,9 @@ const RegistrationForm: React.FC = () => {
   const [hometownSuggestions, setHometownSuggestions] = useState<string[]>([]);
   const [allCities, setAllCities] = useState<string[]>([]);
 
-  // Retrieve user info from Redux store.
-  const storedUser = useSelector((state: RootState) => state.auth.user);
-  const navigate = useNavigate();
+   // Retrieve user info from Redux store.
+   const storedUser = useSelector((state: RootState) => state.auth.user);
+  const navigate= useNavigate()
 
   useEffect(() => {
     if (storedUser) {

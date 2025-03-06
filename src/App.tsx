@@ -11,7 +11,7 @@ import { SearchFriends } from "./pages/search-friends";
 import { UserDetails } from "./pages/user-details";
 import { useLocation } from "react-router-dom";
 import { SideBar } from "./pages/side-bar";
-import MessagingPage from "../src/components/message";
+import MessagingPage from "./components/message";
 
 const Layout = () => {
   const location = useLocation();

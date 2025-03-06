@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import io from "socket.io-client";
+import io, { Socket } from "socket.io-client";
 import {
   Container,
   Row,
@@ -26,6 +26,7 @@ import { useSelector } from "react-redux";
 import { RootState } from "../store";
 import Avatar from "./avatar";
 import dummyImmage from "../assets/reconnect.jpg";
+import chatbg from "../assets/chatbg.jpg"
 
 const backgroundStyle: React.CSSProperties = {
   width: "100vw",
@@ -33,25 +34,6 @@ const backgroundStyle: React.CSSProperties = {
   backgroundColor: "#f0f2f5",
 };
 
-// type TextMessage = {
-//   type: "text";
-//   content: string;
-//   sentByMe: boolean;
-// };
-
-// type ImageMessage = {
-//   type: "image";
-//   content: string; // image data URL
-//   caption?: string;
-//   sentByMe: boolean;
-// };
-
-// type FileMessage = {
-//   type: "file";
-//   content: File;
-//   caption?: string;
-//   sentByMe: boolean;
-// };
 
 type BaseMessage = {
   id: string;
@@ -120,10 +102,14 @@ const MessagingPage: React.FC = () => {
   const videoRef = useRef<HTMLVideoElement>(null);
 
   // Create a ref to store the socket instance
-  const socketRef = useRef<any>(null);
+  const socketRef = useRef<Socket | null>(null);
+
+ 
 
   // Get the current logged in user from Redux store
   const currentUser = useSelector((state: RootState) => state.auth.user);
+
+  
 
   // Simulate fetching dummy users (replace with your API call)
   useEffect(() => {
@@ -180,7 +166,7 @@ const MessagingPage: React.FC = () => {
     });
 
     return () => {
-      socketRef.current.disconnect();
+      socketRef.current!.disconnect();
     };
   }, []);
 
@@ -197,10 +183,10 @@ const MessagingPage: React.FC = () => {
         [roomName]: prevMessagesByRoom[roomName] || [],
       }));
 
-      socketRef.current.emit("joinRoom", roomName);
+      socketRef.current!.emit("joinRoom", roomName);
 
       return () => {
-        socketRef.current.emit("leaveRoom", roomName);
+        socketRef.current!.emit("leaveRoom", roomName);
       };
     }
   }, [activeChatUser, currentUser]);
@@ -210,14 +196,94 @@ const MessagingPage: React.FC = () => {
     setIsTyping(e.target.value.trim() !== "");
   };
 
-  const handleSendMessage = () => {
+  // const handleSendMessage = () => {
+  //   let newMsg: Message | null = null;
+  //   const senderEmail = currentUser?.email;
+  //   const timestamp = Date.now();
+  //   const id = uuidv4();
+  
+  //   if (!senderEmail) return;
+  
+  //   if (editedImage) {
+  //     // Handle edited image
+  //     newMsg = {
+  //       id,
+  //       senderEmail,
+  //       timestamp,
+  //       type: "image",
+  //       content: editedImage,
+  //       caption: message // Include the caption
+  //     };
+  //     setEditedImage(null); // Clear the edited image state
+  //     setTextOverlay(""); // Clear the text overlay
+  //   } else if (previewFile) {
+  //     // Handle file upload
+  //     const reader = new FileReader();
+  //     reader.onload = () => {
+  //       const fileDataUrl = reader.result as string;
+  //       newMsg = {
+  //         id,
+  //         senderEmail,
+  //         timestamp,
+  //         type: previewFileType === "image" ? "image" : "file",
+  //         content: fileDataUrl,
+  //         caption: `${previewFile.name}\n${message}`, // Use the file name as the caption
+  //       };
+  //       setMessage("");
+  //       setIsTyping(false);
+  //       setPreviewFile(null);
+  //       setPreviewFileType(null);
+  //       setTextOverlay("");
+  
+  //       // Emit the message to the server
+  //       if (newMsg !== null && activeChatUser && currentUser) {
+  //         const roomName = [currentUser.email, activeChatUser.email]
+  //           .sort()
+  //           .join("_");
+  //         newMsg = { ...newMsg, room: roomName };
+  //         socketRef.current!.emit("sendMessage", newMsg, () => {
+  //           // Clear the preview file state only after the message is sent
+  //           setPreviewFile(null);
+  //           setPreviewFileType(null);
+  //           setTextOverlay(""); // Clear the text overlay
+  //         });
+  //       }
+  //     };
+  //     reader.readAsDataURL(previewFile); // Convert file to data URL
+  //     return; // Exit early since the rest of the logic is handled in reader.onload
+  //   } else if (message.trim() !== "") {
+  //     // Handle text message
+  //     newMsg = {
+  //       id,
+  //       senderEmail,
+  //       timestamp,
+  //       type: "text",
+  //       content: message,
+  //     };
+  //     setMessage("");
+  //     setIsTyping(false);
+  //   }
+  
+  //   if (newMsg !== null && activeChatUser && currentUser) {
+  //     const roomName = [currentUser.email, activeChatUser.email]
+  //       .sort()
+  //       .join("_");
+  //     newMsg = { ...newMsg, room: roomName };
+  
+  //     // Emit the message to the server
+  //     socketRef.current!.emit("sendMessage", newMsg);
+  //   }
+  // };
+  // Get messages for the current room
+  
+  const handleSendMessage = async () => {
     let newMsg: Message | null = null;
     const senderEmail = currentUser?.email;
     const timestamp = Date.now();
     const id = uuidv4();
-
+  
     if (!senderEmail) return;
-
+  
     if (editedImage) {
       // Handle edited image
       newMsg = {
@@ -226,34 +292,49 @@ const MessagingPage: React.FC = () => {
         timestamp,
         type: "image",
         content: editedImage,
+        caption: message, // Include the caption
       };
       setEditedImage(null); // Clear the edited image state
+      setTextOverlay(""); // Clear the text overlay
     } else if (previewFile) {
-      // Handle file upload
-      const reader = new FileReader();
-      reader.onload = () => {
-        const fileDataUrl = reader.result as string;
+      const captionText = message.trim() 
+      ? `${previewFile.name}\n${message}` 
+      : previewFile.name;
+      
+
+      // Upload the file using FormData instead of converting to Data URL
+      const formData = new FormData();
+      formData.append("file", previewFile);
+  
+      try {
+        // Replace '/upload' with your actual upload endpoint URL
+        const response = await fetch("http://localhost:4000/upload", {
+          method: "POST",
+          body: formData,
+        });
+        if (!response.ok) {
+          throw new Error("File upload failed");
+        }
+        const { fileUrl } = await response.json();
         newMsg = {
           id,
           senderEmail,
           timestamp,
           type: previewFileType === "image" ? "image" : "file",
-          content: fileDataUrl,
+          content: fileUrl, // Use the file URL returned from the server
+          caption: captionText, // Use the file name as the caption
         };
-        setPreviewFile(null); // Clear the preview file state
-        setPreviewFileType(null); // Clear the file type state
-
-        // Emit the message to the server
-        if (newMsg !== null && activeChatUser && currentUser) {
-          const roomName = [currentUser.email, activeChatUser.email]
-            .sort()
-            .join("_");
-          newMsg = { ...newMsg, room: roomName };
-          socketRef.current.emit("sendMessage", newMsg);
-        }
-      };
-      reader.readAsDataURL(previewFile); // Convert file to data URL
-      return; // Exit early since the rest of the logic is handled in reader.onload
+  
+        // Clear states
+        setMessage("");
+        setIsTyping(false);
+        setPreviewFile(null);
+        setPreviewFileType(null);
+        setTextOverlay("");
+      } catch (error) {
+        console.error("Error uploading file:", error);
+        return;
+      }
     } else if (message.trim() !== "") {
       // Handle text message
       newMsg = {
@@ -266,18 +347,17 @@ const MessagingPage: React.FC = () => {
       setMessage("");
       setIsTyping(false);
     }
-
+  
     if (newMsg !== null && activeChatUser && currentUser) {
-      const roomName = [currentUser.email, activeChatUser.email]
-        .sort()
-        .join("_");
+      const roomName = [currentUser.email, activeChatUser.email].sort().join("_");
       newMsg = { ...newMsg, room: roomName };
-
-      // Emit the message to the server
-      socketRef.current.emit("sendMessage", newMsg);
+  
+      // Emit the message to the server via Socket.io
+      socketRef.current!.emit("sendMessage", newMsg);
     }
   };
-  // Get messages for the current room
+  
+  
   const currentRoom =
     activeChatUser && currentUser
       ? [currentUser.email, activeChatUser.email].sort().join("_")
@@ -292,6 +372,16 @@ const MessagingPage: React.FC = () => {
     const files = e.target.files;
     if (files && files.length > 0) {
       const file = files[0];
+
+       // Optional: File size validation (example: 5MB max)
+    const maxFileSize = 5 * 1024 * 1024; // 5MB
+    if (file.size > maxFileSize) {
+      alert("File size is too large. Please select a file smaller than 5MB.");
+      return;
+    }
+
+    console.log("File selected:", file); // Debugging
+
       setPreviewFile(file);
 
       if (file.type.startsWith("image/")) {
@@ -458,7 +548,7 @@ const MessagingPage: React.FC = () => {
           width: "90%",
           maxWidth: "1200px",
           borderRadius: "10px",
-          overflow: "hidden",
+          // overflow: "hidden",
           boxShadow: "0 1px 3px rgba(0, 0, 0, 0.1)",
         }}
       >
@@ -535,7 +625,7 @@ const MessagingPage: React.FC = () => {
         {/* Right Chat Window */}
         <Col
           md={8}
-          style={{ position: "relative", backgroundColor: "#e5ddd5" }}
+          style={{ position: "relative", backgroundColor: "#e5ddd5", height: "100%", display: "flex", flexDirection: "column" }}
         >
           <div
             style={{
@@ -554,18 +644,25 @@ const MessagingPage: React.FC = () => {
                   color: "#fff",
                 }}
               >
-                {activeChatUser
-                  ? `Chat with ${activeChatUser.name}`
-                  : "Select a conversation"}
+{activeChatUser ? (
+  <div style={{ display: "flex", alignItems: "center" }}>
+    <Avatar src={activeChatUser.imageUrl} size={40} />
+    <span style={{ marginLeft: "10px" }}>Chat with {activeChatUser.name}</span>
+  </div>
+) : (
+  "Select a conversation"
+)}
+
               </div>
             </h6>
           </div>
           <div
             style={{
               padding: "10px",
-              height: "calc(100% - 120px)",
-              overflowY: "auto",
-              backgroundColor: "#ece5dd",
+      flex: 1,
+      overflowY: "auto",
+      backgroundColor: "#ece5dd",
+      
             }}
           >
             {messages.map((msg, index) => (
@@ -598,7 +695,8 @@ const MessagingPage: React.FC = () => {
                       padding: "8px 12px",
                       backgroundColor: "#ffffff",
                       borderRadius: "10px 10px 10px 0",
-                      maxWidth: "60%",
+                      maxWidth: "200px",
+                      width:"auto",
                       boxShadow: "0 1px 1px rgba(0, 0, 0, 0.1)",
                     }}
                   >
@@ -612,17 +710,27 @@ const MessagingPage: React.FC = () => {
                       }}
                       onClick={() => openViewer(msg.content, "image")}
                     />
-                    {msg.caption && (
-                      <p
-                        style={{
-                          margin: "10px 0 0",
-                          fontSize: "0.875rem",
-                          color: "#666",
-                        }}
-                      >
-                        {msg.caption}
-                      </p>
-                    )}
+                   {msg.caption && msg.caption.split("\n").length > 1 && (
+      <div
+        style={{
+          marginTop: "0px",
+          padding: "8px",
+          backgroundColor: "#f0f0f0", // Light background for the text
+          borderRadius: "5px",
+        }}
+      >
+        <p
+          style={{
+            margin: 0,
+            fontSize: "0.875rem",
+            color: "#666",
+            whiteSpace: "pre-line", // Preserve line breaks in the caption
+          }}
+        >
+          {msg.caption.split("\n").slice(1).join("\n")} {/* Display the additional text */}
+        </p>
+      </div>
+    )}
                   </div>
                 )}
                 {msg.type === "file" && (
@@ -632,7 +740,8 @@ const MessagingPage: React.FC = () => {
                       padding: "8px 12px",
                       backgroundColor: "#ffffff",
                       borderRadius: "10px 10px 10px 0",
-                      maxWidth: "60%",
+                      maxWidth: "300px",
+                      width:"auto",
                       boxShadow: "0 1px 1px rgba(0, 0, 0, 0.1)",
                       cursor: "pointer",
                     }}
@@ -665,23 +774,36 @@ const MessagingPage: React.FC = () => {
                             margin: "0 0 0 10px",
                             fontSize: "0.875rem",
                             color: "#666",
+                            whiteSpace:"pre-line"
                           }}
                         >
-                          File Attachment
+                         {msg.caption ? msg.caption.split("\n")[0] : "File Attachment"}
                         </p>
                       </div>
+                      
                     )}
-                    {msg.caption && (
-                      <p
-                        style={{
-                          margin: "10px 0 0",
-                          fontSize: "0.875rem",
-                          color: "#666",
-                        }}
-                      >
-                        {msg.caption}
-                      </p>
-                    )}
+      {/* Additional Text (Caption) */}
+    {msg.caption && msg.caption.split("\n").length > 1 && (
+      <div
+        style={{
+          marginTop: "10px",
+          padding: "8px",
+          backgroundColor: "#f0f0f0", // Light background for the text
+          borderRadius: "5px",
+        }}
+      >
+        <p
+          style={{
+            margin: 0,
+            fontSize: "0.875rem",
+            color: "#666",
+            whiteSpace: "pre-line", // Preserve line breaks in the caption
+          }}
+        >
+          {msg.caption.split("\n").slice(1).join("\n")} {/* Display the additional text */}
+        </p>
+      </div>
+    )}
                   </div>
                 )}
                 <div
@@ -691,7 +813,9 @@ const MessagingPage: React.FC = () => {
                     marginTop: "4px",
                   }}
                 >
-                  {new Date().toLocaleTimeString()}
+                 {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+
+
                 </div>
               </div>
             ))}
@@ -768,156 +892,166 @@ const MessagingPage: React.FC = () => {
             )}
           </div>
 
+          
           <div
-            style={{
-              padding: "10px",
-              backgroundColor: "#f0f0f0",
-              borderTop: "1px solid #ddd",
-              position: "absolute",
-              bottom: 0,
-              width: "100%",
-            }}
+  style={{
+    padding: "10px",
+    backgroundColor: "#f0f0f0",
+    borderTop: "1px solid #ddd",
+    position: "sticky",
+    bottom: 0,
+    width: "100%",
+  }}
+>
+  {/* Preview File Section */}
+  {previewFile && (
+    <div
+      style={{
+        marginBottom: "10px",
+        textAlign: "center",
+        position: "relative",
+        maxHeight: "200px",
+        overflowY: "auto",
+      }}
+    >
+      {previewFileType === "image" && previewFile && (
+        <img
+          src={URL.createObjectURL(previewFile)}
+          alt="Preview"
+          style={{ maxWidth: "100%", borderRadius: "10px" }}
+        />
+      )}
+      {previewFileType === "video" && (
+        <video
+          controls
+          src={URL.createObjectURL(previewFile)}
+          style={{ maxWidth: "100%", borderRadius: "10px" }}
+        />
+      )}
+      {previewFileType === "document" && (
+        <div
+          style={{
+            padding: "10px",
+            backgroundColor: "#ffffff",
+            borderRadius: "10px",
+            maxWidth: "90%",
+            margin: "0 auto",
+          }}
+        >
+          <FileEarmark size={48} />
+          <p>{previewFile.name}</p>
+        </div>
+      )}
+      {/* Close Button */}
+      <Button
+        variant="close"
+        size="sm"
+        onClick={closePreview}
+        style={{
+          position: "absolute",
+          top: "10px",
+          right: "10px",
+          zIndex: 1000,
+          backgroundColor: "rgba(255, 255, 255, 0.8)",
+          borderRadius: "50%",
+          padding: "5px",
+        }}
+      >
+        ×
+      </Button>
+    </div>
+  )}
+
+  {/* Input Field and Attachment Menu */}
+  <Form>
+    <Form.Group className="d-flex align-items-center">
+      {/* Attachment Button */}
+      <Button
+        variant="light"
+        style={{ borderRadius: "50%", marginRight: "10px" }}
+        onClick={() => setShowAttachmentMenu(!showAttachmentMenu)}
+      >
+        <Plus size={20} />
+      </Button>
+
+      {/* Attachment Menu */}
+      {showAttachmentMenu && (
+        <div
+          ref={attachmentMenuRef}
+          style={{
+            position: "absolute",
+            bottom: "60px", // Adjust this value if needed
+            left: "10px",
+            backgroundColor: "#ffffff",
+            borderRadius: "10px",
+            boxShadow: "0 2px 5px rgba(0, 0, 0, 0.1)",
+            padding: "10px",
+            width: "200px",
+            zIndex: 1000, // Ensure the menu is above other elements
+          }}
+        >
+          <div
+            style={{ display: "flex", alignItems: "center", padding: "8px", cursor: "pointer" }}
+            onClick={() => handleAttachmentClick("document")}
           >
-            {previewFile && (
-              <div style={{ marginBottom: "10px", textAlign: "center" }}>
-                {previewFileType === "image" && (
-                  <img
-                    src={URL.createObjectURL(previewFile)}
-                    alt="Preview"
-                    style={{ maxWidth: "100%", borderRadius: "10px" }}
-                  />
-                )}
-                {previewFileType === "video" && (
-                  <video
-                    controls
-                    src={URL.createObjectURL(previewFile)}
-                    style={{ maxWidth: "100%", borderRadius: "10px" }}
-                  />
-                )}
-                {previewFileType === "document" && (
-                  <div
-                    style={{
-                      padding: "10px",
-                      backgroundColor: "#ffffff",
-                      borderRadius: "10px",
-                    }}
-                  >
-                    <FileEarmark size={48} />
-                    <p>{previewFile.name}</p>
-                  </div>
-                )}
-                <Button
-                  variant="close"
-                  size="sm"
-                  onClick={closePreview}
-                  style={{ position: "absolute", top: "5px", right: "5px" }}
-                ></Button>
-              </div>
-            )}
-            <Form>
-              <Form.Group className="d-flex align-items-center">
-                <Button
-                  variant="light"
-                  style={{ borderRadius: "50%", marginRight: "10px" }}
-                  onClick={() => setShowAttachmentMenu(!showAttachmentMenu)}
-                >
-                  <Plus size={20} />
-                </Button>
-                {showAttachmentMenu && (
-                  <div
-                    ref={attachmentMenuRef}
-                    style={{
-                      position: "absolute",
-                      bottom: "60px",
-                      left: "10px",
-                      backgroundColor: "#ffffff",
-                      borderRadius: "10px",
-                      boxShadow: "0 2px 5px rgba(0, 0, 0, 0.1)",
-                      padding: "10px",
-                      width: "200px",
-                    }}
-                  >
-                    <div
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        padding: "8px",
-                        cursor: "pointer",
-                      }}
-                      onClick={() => handleAttachmentClick("document")}
-                    >
-                      <FileEarmark size={18} style={{ marginRight: "10px" }} />
-                      <span>Document</span>
-                    </div>
-                    <div
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        padding: "8px",
-                        cursor: "pointer",
-                      }}
-                      onClick={() => handleAttachmentClick("image")}
-                    >
-                      <Image size={18} style={{ marginRight: "10px" }} />
-                      <span>Photos & Videos</span>
-                    </div>
-                    <div
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        padding: "8px",
-                        cursor: "pointer",
-                      }}
-                      onClick={() => handleAttachmentClick("camera")}
-                    >
-                      <Camera size={18} style={{ marginRight: "10px" }} />
-                      <span>Camera</span>
-                    </div>
-                  </div>
-                )}
-                <Button
-                  variant="light"
-                  style={{ borderRadius: "50%", marginRight: "10px" }}
-                  onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-                >
-                  <EmojiSmile size={20} />
-                </Button>
-                <Form.Control
-                  type="text"
-                  placeholder="Type a message"
-                  value={message}
-                  onChange={handleInputChange}
-                  style={{
-                    flex: 1,
-                    borderRadius: "20px",
-                    border: "none",
-                    marginRight: "10px",
-                  }}
-                />
-                {isTyping || previewFile || editedImage ? (
-                  <Button
-                    variant="success"
-                    onClick={handleSendMessage}
-                    style={{ borderRadius: "50%" }}
-                  >
-                    <Send size={20} />
-                  </Button>
-                ) : (
-                  <Button variant="light" style={{ borderRadius: "50%" }}>
-                    <Mic size={20} />
-                  </Button>
-                )}
-              </Form.Group>
-            </Form>
-            {showEmojiPicker && (
-              <div
-                ref={emojiPickerRef}
-                style={{ position: "absolute", bottom: "60px", right: "10px" }}
-              >
-                <EmojiPicker onEmojiClick={handleEmojiClick} />
-              </div>
-            )}
+            <FileEarmark size={18} style={{ marginRight: "10px" }} />
+            <span>Document</span>
           </div>
+          <div
+            style={{ display: "flex", alignItems: "center", padding: "8px", cursor: "pointer" }}
+            onClick={() => handleAttachmentClick("image")}
+          >
+            <Image size={18} style={{ marginRight: "10px" }} />
+            <span>Photos & Videos</span>
+          </div>
+          <div
+            style={{ display: "flex", alignItems: "center", padding: "8px", cursor: "pointer" }}
+            onClick={() => handleAttachmentClick("camera")}
+          >
+            <Camera size={18} style={{ marginRight: "10px" }} />
+            <span>Camera</span>
+          </div>
+        </div>
+      )}
+
+      {/* Emoji Button */}
+      <Button
+        variant="light"
+        style={{ borderRadius: "50%", marginRight: "10px" }}
+        onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+      >
+        <EmojiSmile size={20} />
+      </Button>
+
+      {/* Message Input */}
+      <Form.Control
+        type="text"
+        placeholder="Type a message"
+        value={message}
+        onChange={handleInputChange}
+        style={{ flex: 1, borderRadius: "20px", border: "none", marginRight: "10px" }}
+      />
+
+      {/* Send/Record Button */}
+      {(isTyping || previewFile || editedImage) ? (
+        <Button variant="success" onClick={handleSendMessage} style={{ borderRadius: "50%" }}>
+          <Send size={20} />
+        </Button>
+      ) : (
+        <Button variant="light" style={{ borderRadius: "50%" }}>
+          <Mic size={20} />
+        </Button>
+      )}
+    </Form.Group>
+  </Form>
+
+  {/* Emoji Picker */}
+  {showEmojiPicker && (
+    <div ref={emojiPickerRef} style={{ position: "absolute", bottom: "60px", right: "10px" }}>
+      <EmojiPicker onEmojiClick={handleEmojiClick} />
+    </div>
+  )}
+</div>
         </Col>
       </Row>
       <input
