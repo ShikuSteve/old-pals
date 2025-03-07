@@ -29,7 +29,7 @@ export const SideBar = () => {
 
   const handleConfirm = async (password: string) => {
     setLoading(true); // Start loading
-
+    console.log(password);
     try {
       if (action === "Logging out") {
         await logout();
