@@ -32,8 +32,8 @@ export const SideBar = () => {
   };
 
   const handleConfirm = async (password: string) => {
-    setLoading(true);
-  
+    setLoading(true); // Start loading
+    console.log(password);
     try {
       if (!user) return;
       if (action === "Logging out") {
