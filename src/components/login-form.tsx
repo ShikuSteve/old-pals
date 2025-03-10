@@ -21,7 +21,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onRegisterClick }) => {
   const extractErrorMessage = (error: unknown): string => {
     if (error && typeof error === "object") {
       if ("data" in error && typeof error.data === "object" && error.data !== null) {
-        return (error.data as { message?: string }).message || "An error occurred.";
+        return (error.data as { message?: string }).message || "The Email or Password is incorrect.";
       }
       if ("message" in error && typeof error.message === "string") {
         return error.message;

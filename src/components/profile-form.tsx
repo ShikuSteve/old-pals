@@ -51,6 +51,7 @@ const RegistrationForm: React.FC = () => {
   const [hometownSuggestions, setHometownSuggestions] = useState<string[]>([]);
   const [allCities, setAllCities] = useState<string[]>([]);
   const [updateProfile,{isLoading,isError}]=useUpdateProfileMutation()
+  const [errors, setErrors] = useState<{ [key: string]: string }>({});
 
   // Retrieve user info from Redux store.
   const storedUser = useSelector((state: RootState) => state.auth.user);
@@ -225,14 +226,34 @@ const RegistrationForm: React.FC = () => {
   console.log(formData.profilePicture, "picture");
 
   const handleSubmit = async (e: React.FormEvent) => {
-    try {
+   
       e.preventDefault();
       setLoading(true)
 
-      if (!formData.profilePicture) {
-        return `No picture selected`;
+      const newErrors: { [key: string]: string } = {};
+  
+      if (!formData.fullName.trim()) newErrors.fullName = "Full Name is required";
+      if (!formData.country.trim()) newErrors.country = "Country is required";
+      if (!formData.homeTown.trim()) newErrors.homeTown = "Home Town is required";
+      if (!formData.age.trim()) newErrors.age = "Age is required";
+      if (!formData.email.trim()) newErrors.email = "Email is required";
+      if (formData.interest.length === 0) newErrors.interest = "At least one interest is required";
+      if (!formData.school.trim()) newErrors.school = "School is required";
+      if (!formData.profilePicture) newErrors.profilePicture = "Profile Picture is required";
+    
+      if (Object.keys(newErrors).length > 0) {
+        setErrors(newErrors);
+        setLoading(false);
+        return;
       }
-
+    
+      setErrors({});
+     
+      try {
+        if (!formData.profilePicture) {
+          return "No picture selected";
+        }
+  
       const uploadedImageUrl = await uploadImage(formData.profilePicture);
 
       if (!uploadedImageUrl) {
@@ -289,8 +310,10 @@ const RegistrationForm: React.FC = () => {
               name="fullName"
               value={formData.fullName}
               onChange={handleChange}
-              required
+               required
+               isInvalid={!!errors.fullName}
             />
+            <Form.Control.Feedback type="invalid">{errors.fullName}</Form.Control.Feedback>
           </FloatingLabel>
         </Col>
         <Col md={4}>
@@ -303,6 +326,7 @@ const RegistrationForm: React.FC = () => {
               onChange={handleChange}
               onFocus={handleCountryFocus}
               onBlur={handleCountryBlur}
+              isInvalid={!!errors.country}
             />
             {showCountrySuggestions && countrySuggestions.length > 0 && (
               <div
@@ -321,6 +345,7 @@ const RegistrationForm: React.FC = () => {
                 ))}
               </div>
             )}
+            <Form.Control.Feedback type="invalid">{errors.country}</Form.Control.Feedback>
           </FloatingLabel>
         </Col>
         <Col md={4}>
@@ -333,6 +358,7 @@ const RegistrationForm: React.FC = () => {
               onChange={handleChange}
               onFocus={handleHometownFocus}
               onBlur={handleHometownBlur}
+              isInvalid={!!errors.homeTown}
               required
             />
             {showHometownSuggestions && hometownSuggestions.length > 0 && (
@@ -352,6 +378,7 @@ const RegistrationForm: React.FC = () => {
                 ))}
               </div>
             )}
+         <Form.Control.Feedback type="invalid">{errors.homeTown}</Form.Control.Feedback>
           </FloatingLabel>
         </Col>
       </Row>
@@ -366,8 +393,10 @@ const RegistrationForm: React.FC = () => {
               name="age"
               value={formData.age}
               onChange={handleChange}
+              isInvalid={!!errors.age}
               required
             />
+            <Form.Control.Feedback type="invalid">{errors.age}</Form.Control.Feedback>
           </FloatingLabel>
         </Col>
         <Col md={4}>
@@ -378,7 +407,10 @@ const RegistrationForm: React.FC = () => {
               name="school"
               value={formData.school}
               onChange={handleChange}
+              isInvalid={!!errors.school}
+              required
             />
+            <Form.Control.Feedback type="invalid">{errors.school}</Form.Control.Feedback>
           </FloatingLabel>
         </Col>
         <Col md={4}>
@@ -389,8 +421,10 @@ const RegistrationForm: React.FC = () => {
       name="interest"
       value={formData.interest.join(", ")}
       onFocus={handleFocus}
+      isInvalid={!!errors.interest}
       readOnly
     />
+    <Form.Control.Feedback type="invalid">{errors.interest}</Form.Control.Feedback>
   </FloatingLabel>
   {showInterestSuggestions && (
     <div className="dropdown-menu show">
@@ -416,8 +450,10 @@ const RegistrationForm: React.FC = () => {
           name="email"
           value={formData.email}
           onChange={handleChange}
+          isInvalid={!!errors.email}
           required
         />
+            <Form.Control.Feedback type="invalid">{errors.email}</Form.Control.Feedback>
       </FloatingLabel>
 
       {preview && (
@@ -441,7 +477,9 @@ const RegistrationForm: React.FC = () => {
           type="file"
           accept="image/*"
           onChange={handleFileChange}
+          isInvalid={!!errors.profilePicture}
         />
+        <Form.Control.Feedback type="invalid">{errors.profilePicture}</Form.Control.Feedback>
       </Form.Group>
 
       <Button
