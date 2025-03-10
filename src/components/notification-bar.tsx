@@ -5,7 +5,7 @@ import { PasswordField } from "./password-field";
 
 interface Props {
   action: string;
-  name: string | undefined | null;
+  fullName: string | undefined | null;
   showNotification: boolean;
   setShowNotification: (x: boolean) => void;
   handleConfirm: (x: string) => void;
@@ -14,7 +14,7 @@ interface Props {
 
 export const NotificationModal = ({
   action,
-  name,
+  fullName,
   showNotification,
   setShowNotification,
   handleConfirm,
@@ -34,11 +34,11 @@ export const NotificationModal = ({
       </Modal.Header>
       <Modal.Body>
         {action === "Logging out" ? (
-          <p>{name}, are you sure you want to log out?</p>
+          <p>{fullName}, are you sure you want to log out?</p>
         ) : (
           <>
             <p>
-              {name}, your account will be deleted permanently. This action
+              {fullName}, your account will be deleted permanently. This action
               cannot be undone. We will need your password to verify it is
               really you.
             </p>

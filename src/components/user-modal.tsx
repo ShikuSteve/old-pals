@@ -1,8 +1,10 @@
 import { Button, Modal, Spinner } from "react-bootstrap";
 import { User } from "../pages/search-friends";
 import "../css/modal.css";
-import { addFriend, checkIfFriend } from "../backend/services/user-service";
 import { useEffect, useState } from "react";
+import { useSelector } from "react-redux";
+import { RootState } from "../store";
+import { useAddFriendMutation, useLazyCheckFriendStatusQuery } from "../api/public";
 
 interface Props {
   showModal: boolean;
@@ -15,25 +17,42 @@ export const UserModal = (data: Props) => {
   const [loading, setLoading] = useState(false);
   const [successModal, setSuccessModal] = useState(false);
   const [friendStatus, setFriendStatus] = useState(false); // Single friend check
+  const [addFriend, { isLoading }] = useAddFriendMutation();
+  const [checkFriendStatusTrigger, {isFetching }] = useLazyCheckFriendStatusQuery();
+  const storedUser= useSelector((state: RootState) => state.auth.user);
+  console.log(user,"user")
 
   // Check if the selected user is already a friend
+  // useEffect(() => {
+  //   if (user?._id) {
+  //     checkIfFriend(user._id).then(setFriendStatus);
+  //   }
+  // }, [user?._id]);
+
   useEffect(() => {
-    if (user?.id) {
-      checkIfFriend(user.id).then(setFriendStatus);
+    if (user?._id && storedUser?.uid) {
+      checkFriendStatusTrigger({ userId: storedUser?.uid, friendId: user._id })
+        .unwrap()
+        .then((data) => {
+          console.log("Friend status response:", data);
+          setFriendStatus(data?.isFriend || false); // Assuming API returns { isFriend: true/false }
+        })
+        .catch((error) => console.error("Error checking friend status:", error));
     }
-  }, [user?.id]);
+  }, [user?._id, storedUser?.uid]);
+  
 
   const handleAddFriend = async () => {
     try {
       setLoading(true);
 
-      if (!user?.id) {
+      if (!user?._id||!storedUser?.uid) {
         console.log("No user ID found");
         setLoading(false);
         return;
       }
 
-      await addFriend(user.id);
+      await addFriend({userId:storedUser?.uid,friendId:user._id}).unwrap();
       setFriendStatus(true); // Mark as friend
       setSuccessModal(true);
     } catch (err) {
@@ -52,11 +71,11 @@ export const UserModal = (data: Props) => {
         className="custom-modal"
       >
         <Modal.Header closeButton>
-          <Modal.Title>{user?.name}</Modal.Title>
+          <Modal.Title>{user?.fullName}</Modal.Title>
         </Modal.Header>
         <Modal.Body className="text-center">
           <img
-            src={user?.imageUrl}
+            src={user?.profilePhoto}
             alt="Profile picture"
             className="profile-img"
           />
@@ -64,18 +83,19 @@ export const UserModal = (data: Props) => {
           <p>Country located in: {user?.country}</p>
           <p>Age: {user?.age}</p>
           <p>Email: {user?.email}</p>
-          <p>Hobbies: {user?.Interests}</p>
-          <p>Home town raised in: {user?.homeTown}</p>
+          <p>Hobbies: {user?.interest}</p>
+          <p>Home town raised in: {user?.hometown}</p>
           <Modal.Footer>
             <Button variant="secondary" onClick={() => setShowModal(false)}>
               Close
             </Button>
             <Button
               variant={friendStatus ? "success" : "primary"}
-              disabled={friendStatus}
+              disabled={friendStatus||isLoading||isFetching}
               onClick={friendStatus ? undefined : handleAddFriend}
             >
-              {friendStatus ? "Already a Friend" : "Add Friend"}
+             {isLoading ? "Adding Friend..." : friendStatus ? "Already a Friend" : "Add Friend"}
+
             </Button>
           </Modal.Footer>
         </Modal.Body>
@@ -85,14 +105,14 @@ export const UserModal = (data: Props) => {
       <Modal show={loading} centered backdrop="static">
         <Modal.Body className="text-center">
           <Spinner animation="border" role="status" />
-          <p>Adding {user?.name} to your friends list...</p>
+          <p>Adding {user?.fullName} to your friends list...</p>
         </Modal.Body>
       </Modal>
 
       {/* Success Modal */}
       <Modal show={successModal} onHide={() => setSuccessModal(false)} centered>
         <Modal.Body className="text-center">
-          <p>You can now go to the chats section to chat with {user?.name}!</p>
+          <p>You can now go to the chats section to chat with {user?.fullName}!</p>
           <Button variant="success" onClick={() => setSuccessModal(false)}>
             Okay
           </Button>

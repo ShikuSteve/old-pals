@@ -2,6 +2,7 @@ import storage from "redux-persist/lib/storage"
 import { authReducer, resetAuth, User } from "./slice/auth-slice";
 import { persistCombineReducers, persistStore } from "redux-persist";
 import { Action, configureStore } from "@reduxjs/toolkit";
+import { apiSlice } from "../api/public";
 
 export const globalState: { user?: User } = { user: undefined };
 
@@ -13,6 +14,7 @@ const persistConfig = {
   
   const rootReducer={
     auth:authReducer,
+    [apiSlice.reducerPath]: apiSlice.reducer,
 
   }
 
@@ -22,6 +24,7 @@ const persistConfig = {
     reducer:persistedReducer,
     middleware:getDefaultMiddleware=>getDefaultMiddleware({serializableCheck: false, immutableCheck: false})
     .prepend((_: unknown) => (next: unknown) => (action: unknown) => clearOnLogOut(action as Action, next as Function))
+    .concat(apiSlice.middleware),
 
   })
 

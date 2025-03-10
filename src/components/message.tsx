@@ -23,9 +23,13 @@ import EmojiPicker, { EmojiClickData } from "emoji-picker-react";
 import { v4 as uuidv4 } from "uuid";
 import { useSelector } from "react-redux";
 import { RootState } from "../store";
-import Avatar from "./avatar";
-import dummyImmage from "../assets/reconnect.jpg";
+import Avatar from "./avatar";;
 import { VoiceRecorder } from "./voice-recorder";
+import { useDeleteMessagesMutation, useLazyGetFriendsQuery, useLazyGetMessagesQuery, useSendMessageMutation } from "../api/public";
+import { DummyUser, Message } from "../utils/types";
+import { groupMessagesByDate } from "../utils/date";
+import NoChatsMessage from "./no-chats";
+import DeleteMessage from "./delete";
 
 
 const backgroundStyle: React.CSSProperties = {
@@ -55,47 +59,11 @@ const dataURLtoBlob = (dataURL: string) => {
 };
 
 
-type BaseMessage = {
-  id: string;
-  senderEmail: string; // Could be a username or unique user ID
-  timestamp: number; // Unix timestamp (milliseconds)
-  room?: string;
-};
 
-type TextMessage = BaseMessage & {
-  type: "text";
-  content: string;
-};
-
-type ImageMessage = BaseMessage & {
-  type: "image";
-  content: string; // image data URL or URL after upload
-  caption?: string;
-};
-
-type FileMessage = BaseMessage & {
-  type: "file";
-  content: string; // Use a string for file URL or base64 encoded data
-  caption?: string;
-};
-
-type AudioMessage = BaseMessage & {
-  type: "audio";
-  content: string; // URL or base64 encoded audio data
-};
-
-type Message = TextMessage | ImageMessage | FileMessage | AudioMessage;
-
-interface DummyUser {
-  email: string;
-  id: string;
-  name: string;
-  lastMessage: string;
-  imageUrl?: string;
-}
 
 const MessagingPage: React.FC = () => {
   const [message, setMessage] = useState("");
+  const [updatedMessages, setUpdatedMessages] = useState<Message[]>([]);
   const [isTyping, setIsTyping] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [showAttachmentMenu, setShowAttachmentMenu] = useState(false);
@@ -108,11 +76,8 @@ const MessagingPage: React.FC = () => {
   >(null);
   const [editedImage, setEditedImage] = useState<string | null>(null);
   const [textOverlay, setTextOverlay] = useState("");
-  const [messagesByRoom, setMessagesByRoom] = useState<
-    Record<string, Message[]>
-  >({}); // Store messages by room
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
-  const [dummyUsers, setDummyUsers] = useState<DummyUser[]>([]);
+  const [friends, setFriends] = useState<DummyUser []>([]);
   const [activeChatUser, setActiveChatUser] = useState<DummyUser | null>(null);
   // Modal viewer state
   const [viewerModalVisible, setViewerModalVisible] = useState(false);
@@ -127,96 +92,92 @@ const MessagingPage: React.FC = () => {
   const attachmentMenuRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
-
-  // Create a ref to store the socket instance
+    const [fetchFriends,{isLoading:isFetchingUser,isError:isFriendsError}]=useLazyGetFriendsQuery()
+    const[sendMessage]=useSendMessageMutation()
+    const[fetchMessages,{isLoading,isError}]=useLazyGetMessagesQuery()
+    const [deleteMessages] = useDeleteMessagesMutation();
+  // Create a ref to store the socket instanceF
   const socketRef = useRef<Socket | null>(null);
 
  
 
   // Get the current logged in user from Redux store
   const currentUser = useSelector((state: RootState) => state.auth.user);
+  console.log("current users",currentUser)
 
   
 
-  // Simulate fetching dummy users (replace with your API call)
+  // Fetch friends when the component mounts
   useEffect(() => {
-    setTimeout(() => {
-      const fetchedUsers: DummyUser[] = [
-        {
-          id: "1",
-          name: "Alice Johnson",
-          lastMessage: "Hey, how are you?",
-          email: "textt12@123",
-          imageUrl: `${dummyImmage}`,
-        },
-        {
-          id: "2",
-          name: "Bob Smith",
-          lastMessage: "Let's catch up later.",
-          email: "testttt123@123",
-          imageUrl: `${dummyImmage}`,
-        },
-        {
-          id: "3",
-          name: "John Doe",
-          lastMessage: "See you tomorrow!",
-          email: "testing@1234",
-          // imageUrl: `${dummyImmage}`
-        },
-      ];
-      setDummyUsers(fetchedUsers);
-    }, 1000);
-  }, []);
+    
+    const fetchData = async () => {
+      if (currentUser ) {
+        const { data, error } = await fetchFriends(currentUser.uid); // Fetch friends from Firestore
+        if (error) {
+          console.error("Error fetching friends:", error);
+        } else {
+          console.log("Friends data:", data);
+          setFriends(Array.isArray(data?.friends) ? data.friends : [])
+        } // Set the fetched friends to state
+      }
+    };
 
+    fetchData();
+  }, [currentUser,fetchFriends ]);
+
+  
   // Filter out the current logged in user from the conversation list
-  const conversationUsers = dummyUsers.filter(
-    (user) => user.email !== currentUser?.email
+  const conversationUsers = friends.filter(
+    (user) => user.email !== currentUser ?.email
   );
 
-  // Socket connection and message handling
-  useEffect(() => {
+
+
+
+useEffect(() => {
+  if (activeChatUser  && currentUser ) {
+    console.log("Current User ID:", currentUser?.uid);
+console.log("Active Chat User ID:", activeChatUser?._id);
+
+    const roomName = [currentUser.uid, activeChatUser._id].sort().join("_");
+    console.log(roomName,"roomname")
+
+    // Fetch messages for the room when it changes
+    const loadMessages = async () => {
+      try {
+        const response = await fetchMessages(roomName);
+        
+        if ("data" in response && response.data) {
+          setUpdatedMessages(response.data); // Ensure response.data is an array of messages
+        } else {
+          console.error("No messages found or response format incorrect");
+        }
+      } catch (error) {
+        console.error("Error fetching messages:", error);
+      }
+    };
+    
+
+    loadMessages();
+
+    // Join the room
     socketRef.current = io("http://localhost:4000");
-
     socketRef.current.on("connect", () => {
-      console.log("Connected to socket server!");
-    });
+          console.log("Connected to socket server!");
+        });
+    socketRef.current!.emit("joinRoom", roomName);
 
-    socketRef.current.on("newMessage", (incomingMessage: Message) => {
-      setMessagesByRoom((prevMessagesByRoom) => {
-        const room = incomingMessage.room || "default";
-        const updatedMessages = [
-          ...(prevMessagesByRoom[room] || []),
-          incomingMessage,
-        ];
-        return { ...prevMessagesByRoom, [room]: updatedMessages };
-      });
+    // Listen for new messages
+    socketRef.current!.on("newMessage", (incomingMessage: Message) => {
+      setUpdatedMessages((prevMessages) => [...prevMessages, incomingMessage]);
     });
 
     return () => {
-      socketRef.current!.disconnect();
+      socketRef.current!.emit("leaveRoom", roomName);
+      socketRef.current!.off("newMessage");
     };
-  }, []);
-
-  // Join room when activeChatUser changes
-  useEffect(() => {
-    if (activeChatUser && currentUser) {
-      const roomName = [currentUser.email, activeChatUser.email]
-        .sort()
-        .join("_");
-
-      // Retrieve messages for the room or initialize an empty array
-      setMessagesByRoom((prevMessagesByRoom) => ({
-        ...prevMessagesByRoom,
-        [roomName]: prevMessagesByRoom[roomName] || [],
-      }));
-
-      socketRef.current!.emit("joinRoom", roomName);
-
-      return () => {
-        socketRef.current!.emit("leaveRoom", roomName);
-      };
-    }
-  }, [activeChatUser, currentUser]);
+  }
+}, [activeChatUser , currentUser ]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setMessage(e.target.value);
@@ -225,38 +186,60 @@ const MessagingPage: React.FC = () => {
 
   
   const handleSendMessage = async () => {
+    console.log("sending message")
     let newMsg: Message | null = null;
     const senderEmail = currentUser?.email;
-    const timestamp = Date.now();
+    const senderId=currentUser?.uid
+    const timestamp = new Date();
     const id = uuidv4();
+    
   
-    if (!senderEmail) return;
+    if (!senderEmail || !senderId||!activeChatUser) return;
+    console.log("Authenticated User UID:", currentUser?.uid);
+    const roomName = [currentUser.uid, activeChatUser._id].sort().join("_");
+
+    console.log("Current User:", currentUser );
+    console.log("Active Chat User:", activeChatUser?._id );
+    console.log("Message State:", message);
+    console.log("Trimmed Message:", message.trim());
+    console.log("Captured Image:", capturedImage);
+    console.log("Edited Image:", editedImage);
+    console.log("Preview File:", previewFile);
+    console.log("Audio Blob:", audioBlob);
+    
   
     if (editedImage) {
+      console.log("Handling edited image");
       // Handle edited image
       newMsg = {
         id,
-        senderEmail,
+        // senderEmail,
+        senderId,
         timestamp,
         type: "image",
         content: editedImage,
-        caption: message, // Include the caption
+        caption: message, 
+        room:roomName as string
       };
       setEditedImage(null); // Clear the edited image state
       setTextOverlay(""); // Clear the text overlay
     } else if (capturedImage) {
+      console.log("Handling captured image");
       // Handle captured image
       newMsg = {
         id,
-        senderEmail,
+        // senderEmail,
+        senderId,
         timestamp,
         type: "image",
         content: capturedImage,
-        caption: message, // Include the caption
+        caption: message,
+        room:roomName as string
       };
       setCapturedImage(null); // Clear the captured image state
     }
     else if (previewFile) {
+      console.log("Handling preview file");
       const captionText = message.trim() 
       ? `${previewFile.name}\n${message}` 
       : previewFile.name;
@@ -278,11 +261,13 @@ const MessagingPage: React.FC = () => {
         const { fileUrl } = await response.json();
         newMsg = {
           id,
-          senderEmail,
+          // senderEmail,
+          senderId,
           timestamp,
           type: previewFileType === "image" ? "image" : "file",
           content: fileUrl, // Use the file URL returned from the server
           caption: captionText, // Use the file name as the caption
+          room:roomName as string
         };
   
         // Clear states
@@ -296,49 +281,58 @@ const MessagingPage: React.FC = () => {
         return;
       }
     }else if (audioBlob) {
+      console.log("Handling audio blob");
       // Handle audio message
       const base64Audio = await blobToBase64(audioBlob);
       newMsg = {
         id,
-        senderEmail,
+        // senderEmail,
+        senderId,
         timestamp,
         type: "audio",
         content: base64Audio,
+        room:roomName as string
       };
       setAudioBlob(null);
     setPreviewFile(null);
     setPreviewFileType(null);
      
     }else if (message.trim() !== "") {
+      console.log("Message before sending:", message);
       // Handle text message
       newMsg = {
         id,
-        senderEmail,
+        // senderEmail,
+        senderId,
         timestamp,
         type: "text",
         content: message,
+        room:roomName as string
       };
+      console.log("Text message constructed:", newMsg)
       setMessage("");
       setIsTyping(false);
+    }else {
+      console.log("Message is empty or only whitespace."); // Log if the message is empty
+  }
+
+  socketRef.current?.emit("sendMessage",newMsg)
+  
+  try {
+    if (newMsg && newMsg.room) {
+      await sendMessage(newMsg);
+    } else {
+      console.error("Message object is missing required fields:", newMsg);
     }
-  
-  
-    if (newMsg !== null && activeChatUser && currentUser) {
-      const roomName = [currentUser.email, activeChatUser.email].sort().join("_");
-      newMsg = { ...newMsg, room: roomName };
-  
-      // Emit the message to the server via Socket.io
-      socketRef.current!.emit("sendMessage", newMsg);
-    }
+    
+    
+    setMessage(""); // Clear the input field
+  } catch (error) {
+    console.error("Error sending message:", error);
+  }
   };
   
   
-  const currentRoom =
-    activeChatUser && currentUser
-      ? [currentUser.email, activeChatUser.email].sort().join("_")
-      : null;
-  const messages = currentRoom ? messagesByRoom[currentRoom] || [] : [];
-
   const handleEmojiClick = (emojiObject: EmojiClickData) => {
     setMessage((prevMessage) => prevMessage + emojiObject.emoji);
   };
@@ -459,31 +453,6 @@ const MessagingPage: React.FC = () => {
   
   
 
-  const handleSaveEditedImage = () => {
-    if (capturedImage) {
-      const canvas = document.createElement("canvas");
-      const img = document.createElement("img");
-      img.src = capturedImage;
-      img.onload = () => {
-        canvas.width = img.width;
-        canvas.height = img.height;
-        const context = canvas.getContext("2d");
-        if (context) {
-          context.drawImage(img, 0, 0);
-          context.font = "24px Arial";
-          context.fillStyle = "white";
-          context.textAlign = "center";
-          context.textBaseline = "middle";
-          context.fillText(textOverlay, canvas.width / 2, canvas.height / 2);
-          const editedImageDataUrl = canvas.toDataURL("image/png");
-          setEditedImage(editedImageDataUrl);
-          setIsEditingImage(false);
-          setTextOverlay("");
-        }
-      };
-    }
-  };
-
   // Modal viewer functions
   const openViewer = (url: string, type: "image" | "video" | "document") => {
     setViewerContent(url);
@@ -529,8 +498,15 @@ const MessagingPage: React.FC = () => {
     };
   }, [showEmojiPicker, showAttachmentMenu]);
 
+  const handleDeleteMessage = async (messageId: string) => {
+    try {
+      await deleteMessages(messageId).unwrap(); 
+      setUpdatedMessages((prevMessages) => prevMessages.filter(msg => msg.id !== messageId)); 
+    } catch (error) {
+      console.error("Error deleting message:", error);
+    }
+  };
 
-  {console.log("previewFileType:", previewFileType)}
   return (
     <Container
       fluid
@@ -572,16 +548,20 @@ const MessagingPage: React.FC = () => {
               backgroundColor: "#ffffff",
             }}
           >
-            {conversationUsers.length === 0 ? (
+            {
+            isFetchingUser?(
+              <p style={{ padding: "10px" }}>Loading users...</p>
+            ):isFriendsError?(
+              <p style={{ padding: "10px", color: "red" }}>Error fetching users.</p>
+            ):conversationUsers.length === 0 ? (
               <p style={{ padding: "10px" }}>
-                {dummyUsers.length === 0
-                  ? "Loading users..." 
-                  : "No other users"}
+                {friends.length === 0
+                  ?  "No other users" : "No friends found"}
               </p>
             ) : (
               conversationUsers.map((user) => (
                 <Card
-                  key={user.id}
+                  key={user._id}
                   style={{
                     margin: "10px",
                     cursor: "pointer",
@@ -603,9 +583,9 @@ const MessagingPage: React.FC = () => {
                 >
                   <Card.Body>
                     <div style={{ display: "flex", alignItems: "center" }}>
-                      <Avatar src={user.imageUrl} size={40} />
+                      <Avatar src={user.profilePhoto} size={40} />
                       <div style={{ marginLeft: "10px" }}>
-                        <h6 style={{ margin: 0 }}>{user.name}</h6>
+                        <h6 style={{ margin: 0 }}>{user.fullName}</h6>
                         <small style={{ color: "#666" }}>
                           {user.lastMessage}
                         </small>
@@ -642,8 +622,8 @@ const MessagingPage: React.FC = () => {
               >
 {activeChatUser ? (
   <div style={{ display: "flex", alignItems: "center" }}>
-    <Avatar src={activeChatUser.imageUrl} size={40} />
-    <span style={{ marginLeft: "10px" }}>Chat with {activeChatUser.name}</span>
+    <Avatar src={activeChatUser.profilePhoto} size={40} />
+    <span style={{ marginLeft: "10px" }}>Chat with {activeChatUser.fullName}</span>
   </div>
 ) : (
   "Select a conversation"
@@ -659,15 +639,43 @@ const MessagingPage: React.FC = () => {
       overflowY: "auto",
       backgroundColor: "#ece5dd",
       
-            }}
-          >
+  }}
+  >
+    {isLoading ?(
+       <p style={{ padding: "10px" }}>Loading messages...</p>
+    ):isError ?(
+      <p style={{ padding: "10px", color: "red" }}>Failed to load messages.</p>
+    ):updatedMessages.length === 0 ? (
+      <NoChatsMessage />
+    ) :
+    (Object.entries(groupMessagesByDate(updatedMessages)).map(([dateKey, messages]) => (
+    <div key={dateKey}>
+      {/* Date separator */}
+      <div style={{ 
+        display: 'flex', 
+        alignItems: 'center', 
+        margin: '20px 0',
+        padding: '0 10px'
+      }}>
+        <div style={{ flex: 1, borderBottom: '1px solid #dcdcdc' }} />
+        <span style={{ 
+          margin: '0 10px', 
+          color: '#666',
+          fontSize: '0.75rem',
+          fontWeight: 500,
+          textTransform: 'uppercase'
+        }}>
+          {dateKey}
+        </span>
+        <div style={{ flex: 1, borderBottom: '1px solid #dcdcdc' }} />
+      </div>    
             {messages.map((msg, index) => (
               <div
                 key={index}
                 style={{
                   marginBottom: "10px",
                   textAlign:
-                    msg.senderEmail === currentUser?.email ? "right" : "left",
+                    msg.senderId === currentUser?.uid ? "right" : "left",
                 }}
               >
                 {msg.type === "text" && (
@@ -682,6 +690,7 @@ const MessagingPage: React.FC = () => {
                     }}
                   >
                     <p style={{ margin: 0,color: "#140005" }}>{msg.content}</p>
+                    <DeleteMessage messageId={msg.id} onDelete={handleDeleteMessage} />
                   </div>
                 )}
                 {msg.type === "image" && (
@@ -727,7 +736,9 @@ const MessagingPage: React.FC = () => {
           {msg.caption.split("\n").slice(1).join("\n")} {/* Display the additional text */}
         </p>
       </div>
+      
     )}
+    <DeleteMessage messageId={msg.id} onDelete={handleDeleteMessage} />
                   </div>
                 )}
                 {msg.type === "audio" && (
@@ -747,6 +758,7 @@ const MessagingPage: React.FC = () => {
         display: "block",      
         boxSizing: "border-box",
       }}/>
+      <DeleteMessage messageId={msg.id} onDelete={handleDeleteMessage} />
   </div>
 )}
 
@@ -822,6 +834,7 @@ const MessagingPage: React.FC = () => {
         </p>
       </div>
     )}
+    <DeleteMessage messageId={msg.id} onDelete={handleDeleteMessage} />
                   </div>
                 )}
                 <div
@@ -832,11 +845,12 @@ const MessagingPage: React.FC = () => {
                   }}
                 >
                  {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-
-
-                </div>
+ </div>
               </div>
             ))}
+            </div>
+    ))
+            )}
           
             {isEditingImage && capturedImage && (
               <div style={{ marginBottom: "10px", textAlign: "center" }}>
@@ -865,6 +879,7 @@ const MessagingPage: React.FC = () => {
                 </div>
               </div>
             )}
+            
           </div>
 
           

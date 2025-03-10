@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef } from "react";
 import { Button } from "react-bootstrap";
 import { Mic, StopCircle, Trash } from "react-bootstrap-icons";
 

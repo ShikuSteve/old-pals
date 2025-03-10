@@ -1,23 +1,25 @@
-import { Button, Container, Form, Card } from "react-bootstrap";
+import { Button, Container, Form, Card, Alert } from "react-bootstrap";
 import "../css/search.css";
 import { useEffect, useState } from "react";
 import Loader from "../components/loader";
-import { fetchUsers } from "../backend/services/user-service";
 import { FaSadTear } from "react-icons/fa";
 import { motion } from "framer-motion"; // Import animation
 import { UserModal } from "../components/user-modal";
+import { useSelector } from "react-redux";
+import { RootState } from "../store";
+import { useLazyGetUsersExcludingQuery } from "../api/public";
 
 export interface User {
-  id: string;
-  name: string;
+  _id: string;
+  fullName: string;
   school: string;
   country: string;
   age: number;
   createdAt: string;
   email: string;
-  homeTown: string;
-  imageUrl: string;
-  Interests: string;
+  hometown: string;
+  profilePhoto: string;
+  interest: string;
 }
 
 export const SearchFriends = () => {
@@ -25,43 +27,62 @@ export const SearchFriends = () => {
   const [results, setResults] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [showModal, setShowModal] = useState(false);
-  const [selectedUser, setSelectedUser] = useState<User>();
+  const [selectedUser, setSelectedUser] = useState<User | undefined>(undefined);
+   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // Get current user from Redux to exclude them from results.
+  const storedUser = useSelector((state: RootState) => state.auth.user);
+  const currentUserId = storedUser?.uid || "";
+
+  // RTK Query hook for fetching users excluding the current user.
+  const [triggerFetch, { isLoading: isFetching, error: fetchError }] =
+    useLazyGetUsersExcludingQuery();
+
+    const extractErrorMessage = (error: unknown): string => {
+      if (error && typeof error === "object") {
+        if ("data" in error && typeof error.data === "object" && error.data !== null) {
+          return (error.data as { message?: string }).message || "An error occurred.";
+        }
+        if ("message" in error && typeof error.message === "string") {
+          return error.message;
+        }
+      }
+      return "Failed to serch friends. Please try again.";
+    };
 
   const handleModal = (user: User) => {
     setShowModal(true);
     setSelectedUser(user);
   };
 
+  // Trigger the API call when search is executed.
   const handleSearch = async (showLoader = false) => {
-    if (!searchQuery.trim()) return;
-
+    if (!searchQuery.trim() || !currentUserId) return;
     if (showLoader) setIsLoading(true);
-    setResults([]);
 
     try {
-      const usersData = await fetchUsers();
-
-      if (!Array.isArray(usersData)) {
-        throw new Error("Invalid data received from fetchUsers");
-      }
-
-      const filteredResults = usersData.filter((friend) => {
-        if (!friend || typeof friend !== "object") return false;
-
-        const name = friend.name?.toLowerCase() || "";
+      // Trigger the API call using the lazy hook.
+      const response = await triggerFetch(currentUserId).unwrap();
+      // Assuming response shape is { users: User[] }
+      let users = response.users;
+      
+      // Filter results by search query
+      const lowerQuery = searchQuery.toLowerCase();
+      const filteredResults = users.filter((friend: User) => {
+        const name = friend.fullName?.toLowerCase() || "";
         const school = friend.school?.toLowerCase() || "";
-        const homeTown = friend.homeTown?.toLowerCase() || "";
-
+        const homeTown = friend.hometown?.toLowerCase() || "";
         return (
-          name.includes(searchQuery.toLowerCase()) ||
-          school.includes(searchQuery.toLowerCase()) ||
-          homeTown.includes(searchQuery.toLowerCase())
+          name.includes(lowerQuery) ||
+          school.includes(lowerQuery) ||
+          homeTown.includes(lowerQuery)
         );
       });
-
       setResults(filteredResults);
     } catch (err) {
       console.error("Error fetching users:", err);
+      setErrorMessage(extractErrorMessage(err));
+
     } finally {
       if (showLoader) setIsLoading(false);
     }
@@ -83,7 +104,7 @@ export const SearchFriends = () => {
 
   return (
     <>
-      {showModal && (
+      {showModal && selectedUser && (
         <UserModal
           setShowModal={setShowModal}
           showModal={showModal}
@@ -94,39 +115,31 @@ export const SearchFriends = () => {
         fluid
         className="p-0 m-0 d-flex flex-column align-items-center justify-content-center"
         style={{
-          alignSelf: "center",
           background: "radial-gradient(circle, #070c12, #383939, #292a2b)",
-          // width: "100vw",
           minHeight: "100vh",
           color: "white",
           padding: "30px",
         }}
       >
-        <h2 className="text-center mb-4 " style={{ alignSelf: "center" }}>
-          Find Your Childhood Friends
-        </h2>
-        {/**Search Form */}
+        <h2 className="text-center mb-4">Find Your Childhood Friends</h2>
+        {/** Search Form */}
         <Form
           style={{ height: "50px", width: "100vw" }}
-          className="d-flex justify-content-center  mb-4 "
+          className="d-flex justify-content-center mb-4"
         >
           <Form.Control
             type="text"
-            placeholder="Enter name,school or location"
+            placeholder="Enter name, school or location"
             className="w-50"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
-          <Button
-            variant="primary"
-            className="ms-2"
-            onClick={() => handleSearch(true)}
-          >
+          <Button variant="primary" className="ms-2" onClick={() => handleSearch(true)}>
             {isLoading ? <Loader /> : "Search"}
           </Button>
         </Form>
 
-        {isLoading ? (
+        {isLoading || isFetching ? (
           <Loader />
         ) : (
           results.length > 0 && (
@@ -136,6 +149,7 @@ export const SearchFriends = () => {
             >
               {results.map((friend) => (
                 <Card
+                  key={friend._id}
                   style={{
                     backgroundColor: "#6C6C6C",
                     width: "230px",
@@ -146,7 +160,7 @@ export const SearchFriends = () => {
                 >
                   <Card.Img
                     variant="top"
-                    src={`${friend.imageUrl}`}
+                    src={friend.profilePhoto}
                     style={{
                       width: "150px",
                       height: "150px",
@@ -156,13 +170,9 @@ export const SearchFriends = () => {
                     }}
                   />
                   <Card.Body>
-                    <Card.Title>{friend.name}</Card.Title>
-                    <Card.Text>Home Town: {friend.homeTown}</Card.Text>
-
-                    <Button
-                      variant="primary"
-                      onClick={() => handleModal(friend)}
-                    >
+                    <Card.Title>{friend.fullName}</Card.Title>
+                    <Card.Text>Home Town: {friend.hometown}</Card.Text>
+                    <Button variant="primary" onClick={() => handleModal(friend)}>
                       View More
                     </Button>
                   </Card.Body>
@@ -171,25 +181,21 @@ export const SearchFriends = () => {
             </div>
           )
         )}
-        {!isLoading && results.length === 0 && searchQuery.trim() && (
+
+        {!isLoading && !isFetching && results.length === 0 && searchQuery.trim() && (
           <motion.div
-            animate={{ y: [-10, 10, -10] }} // Bouncing animation
+            animate={{ y: [-10, 10, -10] }}
             transition={{ repeat: Infinity, duration: 1.2, ease: "easeInOut" }}
             style={{ textAlign: "center", marginTop: "30px" }}
           >
             <FaSadTear size={60} style={{ color: "#3498db" }} />
-            <p
-              style={{
-                color: "lightgray",
-                fontSize: "18px",
-                marginTop: "10px",
-              }}
-            >
-              😕 results found..Try searching using other factors.
+            <p style={{ color: "lightgray", fontSize: "18px", marginTop: "10px" }}>
+              😕 No results found. Try searching using other factors.
             </p>
           </motion.div>
         )}
       </Container>
+      {fetchError && errorMessage && <Alert variant="danger">{errorMessage}</Alert>}
     </>
   );
 };

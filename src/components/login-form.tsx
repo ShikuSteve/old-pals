@@ -1,10 +1,10 @@
 import React, { useState } from "react";
-import { Button, Form, InputGroup } from "react-bootstrap";
+import { Alert, Button, Form, InputGroup } from "react-bootstrap";
 import { PasswordField } from "./password-field";
 import { useNavigate } from "react-router-dom";
 import { useDispatch } from "react-redux";
 import { setIsLoggedIn, setUser } from "../store/slice/auth-slice";
-import { login } from "../backend/services/auth-service";
+import { useSigninMutation } from "../api/public";
 
 type LoginFormProps = {
   onRegisterClick: () => void;
@@ -15,28 +15,49 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onRegisterClick }) => {
   const dispatch = useDispatch();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [loginUser,{isLoading,isError}]=useSigninMutation()
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const extractErrorMessage = (error: unknown): string => {
+    if (error && typeof error === "object") {
+      if ("data" in error && typeof error.data === "object" && error.data !== null) {
+        return (error.data as { message?: string }).message || "An error occurred.";
+      }
+      if ("message" in error && typeof error.message === "string") {
+        return error.message;
+      }
+    }
+    return "Failed to login. Please try again.";
+  };
 
   const handleLoginFirebase = async () => {
     try {
-      const response = await login(email, password);
+      // const response = await login(email, password);
+      const response=await loginUser({
+        email,
+        password
+      }).unwrap()
       console.log(response, "response from login");
 
-      if (!response?.user?.uid) {
+      if (!response?.user?._id) {
         return `No user uid found`;
       }
 
-      const idToken = await response.user.getIdToken();
-      if (!response.user.displayName) {
+      const idToken = await response.token;
+      if (!response.user.fullName) {
         return;
       }
       const user = {
         refreshToken: response.user.refreshToken,
+        uid:response.user._id,
         refreshTknExpTime: Date.now() + 3600 * 1000,
         accessTknExpTime: Date.now() + 1800 * 1000,
         email: email,
-        fullName: response.user.displayName,
+        fullName: response.user.fullName,
         accessToken: idToken,
       };
+      console.log("User in Redux:", user);
+
 
       console.log(user, "user login details");
 
@@ -45,27 +66,11 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onRegisterClick }) => {
 
       navigate("/search");
     } catch (err) {
+      setErrorMessage(extractErrorMessage(err));
       console.log(err, "errorrr");
     }
   };
-  // function handleLogin() {
-  //   // Perform your login validation, API calls, etc. here.
-  //   const dummyUser = {
-  //     accessToken: "dummy-access-token",
-  //     refreshToken: "dummy-refresh-token",
-  //     email: "user@example.com",
-  //     fullName: "John Doe",
-  //     phoneNumber: "1234567890",
-  //     imageUrl: "https://example.com/avatar.jpg",
-  //     refreshTknExpTime: Date.now() + 3600 * 1000,
-  //     accessTknExpTime: Date.now() + 1800 * 1000,
-  //   };
-  //   dispatch(setUser(dummyUser));
-  //   dispatch(setIsLoggedIn(true));
-  //   // If successful, navigate to the ProfilePage:
-  //   navigate("/profile");
-  // }
-
+ 
   return (
     <div className="d-flex flex-column justify-content-center align-items-center bg-white h-100 p-3">
       <h2 className="text-center mb-4">Login</h2>
@@ -82,12 +87,14 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onRegisterClick }) => {
           onChange={(e) => setPassword(e.target.value)}
         />
       </InputGroup>
+      {isError && errorMessage && <Alert variant="danger">{errorMessage}</Alert>}
       <Button
         variant="primary"
         className="w-100 mb-3"
         onClick={handleLoginFirebase}
+        disabled={isLoading}
       >
-        Login
+       {isLoading ? "Login..." : "Login"} 
       </Button>
       <p className="mb-0 text-center">
         Don't have an account?

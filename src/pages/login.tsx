@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { useLocation } from "react-router-dom";
 import reconnect from "../assets/reconnect.jpg";
 import OverlayPanel from "../components/overlay-panel";
 import LoginForm from "../components/login-form";
@@ -33,7 +34,8 @@ const panelBaseStyle: React.CSSProperties = {
 };
 
 export const Login: React.FC = () => {
-  const [isActive, setIsActive] = useState(false);
+  const location = useLocation();
+  const [isActive, setIsActive] = useState(location.state?.isActive||false);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {

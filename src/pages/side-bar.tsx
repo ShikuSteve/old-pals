@@ -1,15 +1,19 @@
 import { Link } from "react-router-dom";
 import { FaUser, FaComment, FaUsers, FaSignOutAlt } from "react-icons/fa";
 import "../css/side-bar.css";
-import { auth } from "../firebase";
 import { BiTrash } from "react-icons/bi";
 import { useState } from "react";
 import { NotificationModal } from "../components/notification-bar";
-import { deleteAccount, logout } from "../backend/services/auth-service";
 import { useNavigate } from "react-router-dom";
+import { useSelector } from "react-redux";
+import { RootState } from "../store";
+import { useDeleteAccount } from "../hooks/delete-user";
+import { resetAuth } from "../store/slice/auth-slice";
 
 export const SideBar = () => {
-  const user = auth.currentUser;
+  // const user = auth.currentUser;
+  const user = useSelector((state: RootState) => state.auth.user);
+  const deleteAccountHandler = useDeleteAccount();
 
   const [showNotification, setShowNotification] = useState(false);
   const [action, setAction] = useState("");
@@ -28,38 +32,42 @@ export const SideBar = () => {
   };
 
   const handleConfirm = async (password: string) => {
-    setLoading(true); // Start loading
-
+    setLoading(true);
+  
     try {
+      if (!user) return;
       if (action === "Logging out") {
-        await logout();
+        resetAuth();
         console.log("logged out");
+        navigate("/");
       } else {
-        await deleteAccount(password);
+        await deleteAccountHandler(user.email, password);
         console.log("User account deleted");
+        navigate("/");
       }
-      navigate("/");
+      setShowNotification(false)
     } catch (error) {
       console.error("Error:", error);
+      alert("Incorrect password. Please try again."); // Show error
+      return; // Stop execution
     } finally {
-      setLoading(false); // Stop loading
-      setShowNotification(false);
+      setLoading(false);
     }
   };
-
+  
   return (
     <div className="sidebar">
       {showNotification && (
         <NotificationModal
           handleConfirm={handleConfirm}
           action={action}
-          name={user?.displayName}
+          fullName={user?.fullName}
           setShowNotification={setShowNotification}
           showNotification={showNotification}
           loading={loading} // Pass loading state
         />
       )}
-      <h2 className="logo">{user?.displayName}</h2>
+      <h2 className="logo">{user?.fullName}</h2>
       <ul>
         <li>
           <Link to="/search" className="sidebar-item">

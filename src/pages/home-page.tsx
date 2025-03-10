@@ -21,8 +21,12 @@ export const HomePage = () => {
   };
   const navigate = useNavigate();
   const login = () => {
-    navigate("/login");
+    navigate("/login", { state: { isActive: false } }); // Login panel active
   };
+  const signUp = () => {
+    navigate("/login", { state: { isActive: true } }); // Sign Up panel active
+  };
+
   return (
     <div
       style={{
@@ -125,7 +129,7 @@ export const HomePage = () => {
         <div className="mt-4">
           <button
             className="btn btn-primary btn-hover-pop me-5 p-4 "
-            onClick={login}
+            onClick={signUp}
           >
             Sign Up
           </button>

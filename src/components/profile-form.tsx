@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from "react";
-import { Form, Button, Row, Col, FloatingLabel } from "react-bootstrap";
+import { Form, Button, Row, Col, FloatingLabel, Container } from "react-bootstrap";
 import { useSelector } from "react-redux";
 import { RootState } from "../store";
 import { useNavigate } from "react-router-dom";
-import { saveAdditionalUserInfo } from "../backend/services/user-service";
+// import { saveAdditionalUserInfo } from "../backend/services/user-service";
 import { uploadImage } from "../utils/upload-image";
+import { useUpdateProfileMutation } from "../api/public";
+import { interestOptions } from "../utils/types";
 
 interface FormData {
   fullName: string;
@@ -13,24 +15,12 @@ interface FormData {
   country: string;
   countryCode?: string;
   school: string;
-  interests: string;
+  interest: string[];
   email: string;
   profilePicture: File | null;
 }
 
-// We'll still use a simple array for interests.
-const interestOptions = [
-  "Sports",
-  "Music",
-  "Art",
-  "Technology",
-  "Travel",
-  "Reading",
-  "Gaming",
-  "Cooking",
-  "Fitness",
-  "Fashion",
-];
+
 
 interface CountrySuggestion {
   name: string;
@@ -43,11 +33,12 @@ const RegistrationForm: React.FC = () => {
     age: "",
     country: "",
     school: "",
-    interests: "",
+    interest: [],
     email: "",
     profilePicture: null,
   });
   const [preview, setPreview] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
   const [showInterestSuggestions, setShowInterestSuggestions] =
     useState<boolean>(false);
   const [showCountrySuggestions, setShowCountrySuggestions] =
@@ -59,6 +50,7 @@ const RegistrationForm: React.FC = () => {
     useState<boolean>(false);
   const [hometownSuggestions, setHometownSuggestions] = useState<string[]>([]);
   const [allCities, setAllCities] = useState<string[]>([]);
+  const [updateProfile,{isLoading,isError}]=useUpdateProfileMutation()
 
   // Retrieve user info from Redux store.
   const storedUser = useSelector((state: RootState) => state.auth.user);
@@ -170,9 +162,9 @@ const RegistrationForm: React.FC = () => {
     }
   };
 
-  const filteredInterestOptions = interestOptions.filter((option) =>
-    option.toLowerCase().includes(formData.interests.toLowerCase())
-  );
+  // const filteredInterestOptions = interestOptions.filter((option) =>
+  //   option.toLowerCase().includes(formData.interest.toLowerCase())
+  // );
 
   const handleCountryOptionClick = (suggestion: CountrySuggestion) => {
     setFormData((prev) => ({
@@ -189,13 +181,25 @@ const RegistrationForm: React.FC = () => {
   };
 
   const handleOptionClick = (option: string) => {
-    setFormData((prev) => ({ ...prev, interests: option }));
-    setShowInterestSuggestions(false);
+    setFormData((prev) => {
+      const updatedInterests = prev.interest.includes(option)
+        ? prev.interest.filter((i) => i !== option) // Remove if already selected
+        : [...prev.interest, option]; 
+      return { ...prev, interest: updatedInterests };
+    });
   };
 
+  const handleOptionMouseDown = (option: string) => {
+    handleOptionClick(option);
+    // Prevent blur event from firing when clicking on an option
+    setShowInterestSuggestions(false);
+  };
+  
+  
+
   const handleFocus = () => setShowInterestSuggestions(true);
-  const handleBlur = () =>
-    setTimeout(() => setShowInterestSuggestions(false), 150);
+  // const handleBlur = () =>
+  //   setTimeout(() => setShowInterestSuggestions(false), 150);
 
   const handleCountryFocus = () => setShowCountrySuggestions(true);
   const handleCountryBlur = () =>
@@ -223,6 +227,7 @@ const RegistrationForm: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     try {
       e.preventDefault();
+      setLoading(true)
 
       if (!formData.profilePicture) {
         return `No picture selected`;
@@ -237,21 +242,40 @@ const RegistrationForm: React.FC = () => {
 
       const data = {
         school: formData.school,
-        imageUrl: uploadedImageUrl,
-        Interests: formData.interests,
+        profilePhoto: uploadedImageUrl,
+        interest: formData.interest,
         country: formData.country,
-        homeTown: formData.homeTown,
+        hometown: formData.homeTown,
         age: Number(formData.age),
       };
       console.log(data);
       console.log("Form Data Submitted:", formData);
-      const response = await saveAdditionalUserInfo(data);
-      console.log(response);
+     
+      if (!storedUser?.uid) {
+        console.error("No stored user ID found");
+        return;
+      }
+      const response = await updateProfile({
+        userId:storedUser?.uid,
+        profileData:data
+      }).unwrap();
+      console.log("Profile update response:", response);
       navigate("/search");
     } catch (err) {
       console.log(err, "error from updating user details");
+    }finally{
+      setLoading(false)
     }
   };
+
+  if (isError) {
+    return (
+      <Container className="text-center mt-5">
+        <h2 className="text-danger">Error loading user data.</h2>
+        <p>Please try again later.</p>
+      </Container>
+    );
+  }
 
   return (
     <Form onSubmit={handleSubmit}>
@@ -358,35 +382,31 @@ const RegistrationForm: React.FC = () => {
           </FloatingLabel>
         </Col>
         <Col md={4}>
-          <FloatingLabel label="Interests" className="mb-3">
-            <Form.Control
-              type="text"
-              placeholder="Select or type your interests"
-              name="interests"
-              value={formData.interests}
-              onChange={handleChange}
-              onFocus={handleFocus}
-              onBlur={handleBlur}
-            />
-            {showInterestSuggestions && filteredInterestOptions.length > 0 && (
-              <div
-                className="list-group position-absolute"
-                style={{ zIndex: 1000, width: "100%" }}
-              >
-                {filteredInterestOptions.map((option) => (
-                  <button
-                    type="button"
-                    className="list-group-item list-group-item-action"
-                    key={option}
-                    onMouseDown={() => handleOptionClick(option)}
-                  >
-                    {option}
-                  </button>
-                ))}
-              </div>
-            )}
-          </FloatingLabel>
-        </Col>
+  <FloatingLabel label="Interest" className="mb-3">
+    <Form.Control
+      type="text"
+      placeholder="Select Interests"
+      name="interest"
+      value={formData.interest.join(", ")}
+      onFocus={handleFocus}
+      readOnly
+    />
+  </FloatingLabel>
+  {showInterestSuggestions && (
+    <div className="dropdown-menu show">
+      {interestOptions.map((option) => (
+        <div
+          key={option}
+          className="dropdown-item"
+          onClick={() => handleOptionMouseDown(option)}
+        >
+          {option}
+        </div>
+      ))}
+    </div>
+  )}
+</Col>
+
       </Row>
 
       <FloatingLabel label="Email" className="mb-3">
@@ -428,8 +448,9 @@ const RegistrationForm: React.FC = () => {
         type="submit"
         className="w-100 rounded-pill btn-primary"
         onClick={handleSubmit}
+        disabled={isLoading||loading}
       >
-        Register
+       {isLoading||loading ? "Registering..." : "Register"} 
       </Button>
     </Form>
   );

@@ -13,6 +13,7 @@ import { useLocation } from "react-router-dom";
 import { SideBar } from "./pages/side-bar";
 import MessagingPage from "./components/message";
 
+
 const Layout = () => {
   const location = useLocation();
   const hideSidebarRoutes = ["/", "/login", "/profile"];
@@ -36,6 +37,7 @@ const Layout = () => {
           <Route path="/search" element={<SearchFriends />} />
           <Route path="/user-details" element={<UserDetails />} />
           <Route path="/chat" element={<MessagingPage />} />
+          
         </Routes>
       </div>
     </div>
