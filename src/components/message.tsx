@@ -11,7 +11,6 @@ import {
 } from "react-bootstrap";
 import {
   Plus,
-  Mic,
   Send,
   EmojiSmile,
   FileEarmark,
@@ -26,12 +25,33 @@ import { useSelector } from "react-redux";
 import { RootState } from "../store";
 import Avatar from "./avatar";
 import dummyImmage from "../assets/reconnect.jpg";
-import chatbg from "../assets/chatbg.jpg"
+import { VoiceRecorder } from "./voice-recorder";
+
 
 const backgroundStyle: React.CSSProperties = {
   width: "100vw",
   height: "100vh",
-  backgroundColor: "#f0f2f5",
+  backgroundColor: "#76abdf",
+};
+
+function blobToBase64(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = (error) => reject(error);
+    reader.readAsDataURL(blob);
+  });
+}
+
+const dataURLtoBlob = (dataURL: string) => {
+  const byteString = atob(dataURL.split(',')[1]);
+  const mimeString = dataURL.split(',')[0].split(':')[1].split(';')[0];
+  const ab = new ArrayBuffer(byteString.length);
+  const ia = new Uint8Array(ab);
+  for (let i = 0; i < byteString.length; i++) {
+    ia[i] = byteString.charCodeAt(i);
+  }
+  return new Blob([ab], { type: mimeString });
 };
 
 
@@ -59,7 +79,12 @@ type FileMessage = BaseMessage & {
   caption?: string;
 };
 
-type Message = TextMessage | ImageMessage | FileMessage;
+type AudioMessage = BaseMessage & {
+  type: "audio";
+  content: string; // URL or base64 encoded audio data
+};
+
+type Message = TextMessage | ImageMessage | FileMessage | AudioMessage;
 
 interface DummyUser {
   email: string;
@@ -79,13 +104,14 @@ const MessagingPage: React.FC = () => {
   const [isEditingImage, setIsEditingImage] = useState(false);
   const [previewFile, setPreviewFile] = useState<File | null>(null);
   const [previewFileType, setPreviewFileType] = useState<
-    "image" | "video" | "document" | null
+    "image" | "video" | "document" | "audio"|null
   >(null);
   const [editedImage, setEditedImage] = useState<string | null>(null);
   const [textOverlay, setTextOverlay] = useState("");
   const [messagesByRoom, setMessagesByRoom] = useState<
     Record<string, Message[]>
   >({}); // Store messages by room
+  const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const [dummyUsers, setDummyUsers] = useState<DummyUser[]>([]);
   const [activeChatUser, setActiveChatUser] = useState<DummyUser | null>(null);
   // Modal viewer state
@@ -95,6 +121,7 @@ const MessagingPage: React.FC = () => {
     "image" | "video" | "document" | null
   >(null);
   const [isFullScreen, setIsFullScreen] = useState(false);
+  const [isCameraOpen, setIsCameraOpen] = useState(false);
 
   const emojiPickerRef = useRef<HTMLDivElement>(null);
   const attachmentMenuRef = useRef<HTMLDivElement>(null);
@@ -196,85 +223,6 @@ const MessagingPage: React.FC = () => {
     setIsTyping(e.target.value.trim() !== "");
   };
 
-  // const handleSendMessage = () => {
-  //   let newMsg: Message | null = null;
-  //   const senderEmail = currentUser?.email;
-  //   const timestamp = Date.now();
-  //   const id = uuidv4();
-  
-  //   if (!senderEmail) return;
-  
-  //   if (editedImage) {
-  //     // Handle edited image
-  //     newMsg = {
-  //       id,
-  //       senderEmail,
-  //       timestamp,
-  //       type: "image",
-  //       content: editedImage,
-  //       caption: message // Include the caption
-  //     };
-  //     setEditedImage(null); // Clear the edited image state
-  //     setTextOverlay(""); // Clear the text overlay
-  //   } else if (previewFile) {
-  //     // Handle file upload
-  //     const reader = new FileReader();
-  //     reader.onload = () => {
-  //       const fileDataUrl = reader.result as string;
-  //       newMsg = {
-  //         id,
-  //         senderEmail,
-  //         timestamp,
-  //         type: previewFileType === "image" ? "image" : "file",
-  //         content: fileDataUrl,
-  //         caption: `${previewFile.name}\n${message}`, // Use the file name as the caption
-  //       };
-  //       setMessage("");
-  //       setIsTyping(false);
-  //       setPreviewFile(null);
-  //       setPreviewFileType(null);
-  //       setTextOverlay("");
-  
-  //       // Emit the message to the server
-  //       if (newMsg !== null && activeChatUser && currentUser) {
-  //         const roomName = [currentUser.email, activeChatUser.email]
-  //           .sort()
-  //           .join("_");
-  //         newMsg = { ...newMsg, room: roomName };
-  //         socketRef.current!.emit("sendMessage", newMsg, () => {
-  //           // Clear the preview file state only after the message is sent
-  //           setPreviewFile(null);
-  //           setPreviewFileType(null);
-  //           setTextOverlay(""); // Clear the text overlay
-  //         });
-  //       }
-  //     };
-  //     reader.readAsDataURL(previewFile); // Convert file to data URL
-  //     return; // Exit early since the rest of the logic is handled in reader.onload
-  //   } else if (message.trim() !== "") {
-  //     // Handle text message
-  //     newMsg = {
-  //       id,
-  //       senderEmail,
-  //       timestamp,
-  //       type: "text",
-  //       content: message,
-  //     };
-  //     setMessage("");
-  //     setIsTyping(false);
-  //   }
-  
-  //   if (newMsg !== null && activeChatUser && currentUser) {
-  //     const roomName = [currentUser.email, activeChatUser.email]
-  //       .sort()
-  //       .join("_");
-  //     newMsg = { ...newMsg, room: roomName };
-  
-  //     // Emit the message to the server
-  //     socketRef.current!.emit("sendMessage", newMsg);
-  //   }
-  // };
-  // Get messages for the current room
   
   const handleSendMessage = async () => {
     let newMsg: Message | null = null;
@@ -296,7 +244,19 @@ const MessagingPage: React.FC = () => {
       };
       setEditedImage(null); // Clear the edited image state
       setTextOverlay(""); // Clear the text overlay
-    } else if (previewFile) {
+    } else if (capturedImage) {
+      // Handle captured image
+      newMsg = {
+        id,
+        senderEmail,
+        timestamp,
+        type: "image",
+        content: capturedImage,
+        caption: message, // Include the caption
+      };
+      setCapturedImage(null); // Clear the captured image state
+    }
+    else if (previewFile) {
       const captionText = message.trim() 
       ? `${previewFile.name}\n${message}` 
       : previewFile.name;
@@ -335,7 +295,21 @@ const MessagingPage: React.FC = () => {
         console.error("Error uploading file:", error);
         return;
       }
-    } else if (message.trim() !== "") {
+    }else if (audioBlob) {
+      // Handle audio message
+      const base64Audio = await blobToBase64(audioBlob);
+      newMsg = {
+        id,
+        senderEmail,
+        timestamp,
+        type: "audio",
+        content: base64Audio,
+      };
+      setAudioBlob(null);
+    setPreviewFile(null);
+    setPreviewFileType(null);
+     
+    }else if (message.trim() !== "") {
       // Handle text message
       newMsg = {
         id,
@@ -347,6 +321,7 @@ const MessagingPage: React.FC = () => {
       setMessage("");
       setIsTyping(false);
     }
+  
   
     if (newMsg !== null && activeChatUser && currentUser) {
       const roomName = [currentUser.email, activeChatUser.email].sort().join("_");
@@ -366,6 +341,12 @@ const MessagingPage: React.FC = () => {
 
   const handleEmojiClick = (emojiObject: EmojiClickData) => {
     setMessage((prevMessage) => prevMessage + emojiObject.emoji);
+  };
+
+  const handleAudioRecorded = (blob: Blob) => {
+    setAudioBlob(blob);
+    setPreviewFileType("audio")
+   
   };
 
   const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -388,6 +369,8 @@ const MessagingPage: React.FC = () => {
         setPreviewFileType("image");
       } else if (file.type.startsWith("video/")) {
         setPreviewFileType("video");
+      } else if (file.type.startsWith("audio/")) {
+        setPreviewFileType("audio");
       } else {
         setPreviewFileType("document");
       }
@@ -434,6 +417,7 @@ const MessagingPage: React.FC = () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: true });
       setCameraStream(stream);
+      setIsCameraOpen(true)
     } catch (error) {
       console.error("Error accessing camera:", error);
       alert(
@@ -447,6 +431,7 @@ const MessagingPage: React.FC = () => {
       cameraStream.getTracks().forEach((track) => track.stop());
       setCameraStream(null);
     }
+    setIsCameraOpen(false);
   };
 
   const capturePhoto = () => {
@@ -454,16 +439,25 @@ const MessagingPage: React.FC = () => {
       const canvas = document.createElement("canvas");
       canvas.width = videoRef.current.videoWidth;
       canvas.height = videoRef.current.videoHeight;
-      const context = canvas.getContext("2d");
-      if (context) {
-        context.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
-        const imageDataUrl = canvas.toDataURL("image/png");
-        setCapturedImage(imageDataUrl);
-        setIsEditingImage(true);
+      const ctx = canvas.getContext("2d");
+      if (ctx) {
+        ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
+        const dataUrl = canvas.toDataURL("image/png");
+  
+        // Convert data URL to a File and set preview in the chat
+        const file = new File([dataURLtoBlob(dataUrl)], "captured_image.png", {
+          type: "image/png",
+        });
+        setPreviewFile(file);
+        setPreviewFileType("image");
+  
+        // Close or hide the inline camera preview
         closeCamera();
       }
     }
   };
+  
+  
 
   const handleSaveEditedImage = () => {
     if (capturedImage) {
@@ -535,6 +529,8 @@ const MessagingPage: React.FC = () => {
     };
   }, [showEmojiPicker, showAttachmentMenu]);
 
+
+  {console.log("previewFileType:", previewFileType)}
   return (
     <Container
       fluid
@@ -555,15 +551,15 @@ const MessagingPage: React.FC = () => {
         {/* Left Sidebar: Conversation List */}
         <Col
           md={4}
-          style={{ backgroundColor: "#ffffff", borderRight: "1px solid #ddd" }}
+          style={{ backgroundColor: "#ffffff ", borderRight: "1px solid #ddd" }}
         >
           <div
             style={{
               padding: "10px",
-              backgroundColor: "#075e54",
+              backgroundColor: "#3E7BE7",
               color: "#fff",
-              display: "flex",
-              alignItems: "center",
+              display: "flex",             
+              alignItems: "center", 
               justifyContent: "space-between",
             }}
           >
@@ -579,7 +575,7 @@ const MessagingPage: React.FC = () => {
             {conversationUsers.length === 0 ? (
               <p style={{ padding: "10px" }}>
                 {dummyUsers.length === 0
-                  ? "Loading users..."
+                  ? "Loading users..." 
                   : "No other users"}
               </p>
             ) : (
@@ -630,7 +626,7 @@ const MessagingPage: React.FC = () => {
           <div
             style={{
               padding: "10px",
-              backgroundColor: "#075e54",
+              backgroundColor: "#3E7BE7",
               borderBottom: "1px solid #ddd",
               color: "#fff",
             }}
@@ -639,7 +635,7 @@ const MessagingPage: React.FC = () => {
               <div
                 style={{
                   padding: "10px",
-                  backgroundColor: "#075e54",
+                  backgroundColor: "#3E7BE7",
                   borderBottom: "1px solid #ddd",
                   color: "#fff",
                 }}
@@ -679,13 +675,13 @@ const MessagingPage: React.FC = () => {
                     style={{
                       display: "inline-block",
                       padding: "8px 12px",
-                      backgroundColor: "#dcf8c6",
+                      backgroundColor: "#3E7BE7",
                       borderRadius: "10px 10px 0 10px",
                       maxWidth: "60%",
                       boxShadow: "0 1px 1px rgba(0, 0, 0, 0.1)",
                     }}
                   >
-                    <p style={{ margin: 0 }}>{msg.content}</p>
+                    <p style={{ margin: 0,color: "#140005" }}>{msg.content}</p>
                   </div>
                 )}
                 {msg.type === "image" && (
@@ -695,6 +691,7 @@ const MessagingPage: React.FC = () => {
                       padding: "8px 12px",
                       backgroundColor: "#ffffff",
                       borderRadius: "10px 10px 10px 0",
+                      border: "1px solid #ddd",
                       maxWidth: "200px",
                       width:"auto",
                       boxShadow: "0 1px 1px rgba(0, 0, 0, 0.1)",
@@ -733,6 +730,26 @@ const MessagingPage: React.FC = () => {
     )}
                   </div>
                 )}
+                {msg.type === "audio" && (
+  <div
+    style={{
+      display: "inline-block",
+      padding: "8px 12px",
+      backgroundColor: "#ffffff",
+      borderRadius: "10px 10px 10px 0",
+      border: "1px solid #ddd",
+      maxWidth: "300px",
+      boxShadow: "0 1px 1px rgba(0, 0, 0, 0.1)",
+    }}
+  > 
+    <audio controls src={msg.content}    style={{
+        maxWidth: "100%",      
+        display: "block",      
+        boxSizing: "border-box",
+      }}/>
+  </div>
+)}
+
                 {msg.type === "file" && (
                   <div
                     style={{
@@ -740,6 +757,7 @@ const MessagingPage: React.FC = () => {
                       padding: "8px 12px",
                       backgroundColor: "#ffffff",
                       borderRadius: "10px 10px 10px 0",
+                      border: "1px solid #ddd",
                       maxWidth: "300px",
                       width:"auto",
                       boxShadow: "0 1px 1px rgba(0, 0, 0, 0.1)",
@@ -819,29 +837,7 @@ const MessagingPage: React.FC = () => {
                 </div>
               </div>
             ))}
-            {cameraStream && (
-              <div style={{ marginBottom: "10px", textAlign: "center" }}>
-                <video
-                  ref={videoRef}
-                  autoPlay
-                  style={{ maxWidth: "100%", borderRadius: "10px" }}
-                />
-                <Button
-                  variant="danger"
-                  onClick={closeCamera}
-                  style={{ marginTop: "10px" }}
-                >
-                  Close Camera
-                </Button>
-                <Button
-                  variant="primary"
-                  onClick={capturePhoto}
-                  style={{ marginTop: "10px", marginLeft: "10px" }}
-                >
-                  Capture Photo
-                </Button>
-              </div>
-            )}
+          
             {isEditingImage && capturedImage && (
               <div style={{ marginBottom: "10px", textAlign: "center" }}>
                 <div style={{ position: "relative", display: "inline-block" }}>
@@ -867,27 +863,6 @@ const MessagingPage: React.FC = () => {
                     </div>
                   )}
                 </div>
-                <Form.Control
-                  type="text"
-                  placeholder="Add text to image"
-                  value={textOverlay}
-                  onChange={(e) => setTextOverlay(e.target.value)}
-                  style={{ marginTop: "10px", width: "80%" }}
-                />
-                <Button
-                  variant="success"
-                  onClick={handleSaveEditedImage}
-                  style={{ marginTop: "10px" }}
-                >
-                  Save and Send
-                </Button>
-                <Button
-                  variant="danger"
-                  onClick={() => setIsEditingImage(false)}
-                  style={{ marginTop: "10px", marginLeft: "10px" }}
-                >
-                  Cancel
-                </Button>
               </div>
             )}
           </div>
@@ -903,8 +878,29 @@ const MessagingPage: React.FC = () => {
     width: "100%",
   }}
 >
+{cameraStream && (
+  <div style={{ marginBottom: "10px", textAlign: "center" }}>
+    <video
+      ref={videoRef}
+      autoPlay
+      style={{ maxWidth: "100%", borderRadius: "10px" }}
+    />
+    <Button variant="danger" onClick={closeCamera} style={{ marginTop: "10px" }}>
+      Close Camera
+    </Button>
+    <Button
+      variant="primary"
+      onClick={capturePhoto}
+      style={{ marginTop: "10px", marginLeft: "10px" }}
+    >
+      Capture Photo
+    </Button>
+  </div>
+)}
+
+
   {/* Preview File Section */}
-  {previewFile && (
+  {(previewFile )&& (
     <div
       style={{
         marginBottom: "10px",
@@ -1024,13 +1020,16 @@ const MessagingPage: React.FC = () => {
       </Button>
 
       {/* Message Input */}
-      <Form.Control
-        type="text"
-        placeholder="Type a message"
-        value={message}
-        onChange={handleInputChange}
-        style={{ flex: 1, borderRadius: "20px", border: "none", marginRight: "10px" }}
-      />
+       {previewFileType !== "audio" && (
+    <Form.Control
+      type="text"
+      placeholder="Type a message"
+      value={message}
+      onChange={handleInputChange}
+      style={{ flex: 1, borderRadius: "20px", border: "none", marginRight: "10px" }}
+    />
+  )}
+
 
       {/* Send/Record Button */}
       {(isTyping || previewFile || editedImage) ? (
@@ -1038,9 +1037,10 @@ const MessagingPage: React.FC = () => {
           <Send size={20} />
         </Button>
       ) : (
-        <Button variant="light" style={{ borderRadius: "50%" }}>
-          <Mic size={20} />
-        </Button>
+        // <Button variant="light" style={{ borderRadius: "50%" }}>
+        //   <Mic size={20} />
+        // </Button>
+        <VoiceRecorder onRecorded={handleAudioRecorded} onSend={handleSendMessage}/>
       )}
     </Form.Group>
   </Form>
