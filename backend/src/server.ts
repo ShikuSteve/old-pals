@@ -4,11 +4,24 @@ import path from "path";
 import multer from "multer";
 import { Server } from "socket.io";
 import cors from "cors"
+import {mainroutes} from "./routes/main"
+import type { NextFunction, Request, Response } from "express";
+import mongoose from "mongoose";
+
+// Set up MongoDB connection
+const MONGO_URI = process.env.MONGO_URI || "mongodb+srv://Shiku_Steve:10102003Shiku!@cluster0.7arwftj.mongodb.net/com312?retryWrites=true&w=majority&appName=Cluster0";
+
+mongoose.connect(MONGO_URI)
+  .then(() => console.log("MongoDB connected"))
+  .catch((error) => console.error("MongoDB connection error:", error));
+
 
 const app = express();
 
 // Enable CORS for all routes
 app.use(cors());
+
+app.use(express.json());
 
 const server = http.createServer(app);
 const io = new Server(server, {
@@ -32,15 +45,21 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage });
 
-// File upload endpoint
-app.post("/upload", upload.single("file"), (req, res) => {
-  if (!req.file) {
-    return res.status(400).json({ error: "No file uploaded" });
+app.post(
+  "/upload",
+  upload.single("file"),
+  (req: Request, res: Response, next: NextFunction): void => {
+    if (!req.file) {
+      res.status(400).json({ error: "No file uploaded" });
+      return;
+    }
+    // Create the file URL; adjust the host/port if needed.
+    const fileUrl = `http://localhost:4000/uploads/${req.file.filename}`;
+    res.json({ fileUrl });
   }
-  // Create the file URL; adjust the host/port if needed.
-  const fileUrl = `http://localhost:4000/uploads/${req.file.filename}`;
-  res.json({ fileUrl });
-});
+);
+
+app.use("/api", mainroutes);
 
 // Socket.io connection
 io.on("connection", (socket) => {

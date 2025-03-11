@@ -14,22 +14,28 @@ import phone from "../assets/phone.png";
 import x from "../assets/x.png";
 import { useEffect, useRef, useState } from "react";
 import { EditProfileModal } from "./edit-profile";
-import { auth } from "../firebase";
-import { fetchFriends, getUser } from "../backend/services/user-service";
-import { DocumentData } from "firebase/firestore";
+// import { fetchFriends } from "../backend/services/user-service";
+// import { DocumentData } from "firebase/firestore";
 import Loader from "../components/loader";
 import "../css/modal.css";
 import { User } from "./search-friends";
 import { BookFill, EnvelopeFill, PersonFill } from "react-bootstrap-icons";
+import { useLazyGetFriendsQuery, useLazyGetUserByIdQuery } from "../api/public";
+import { useSelector } from "react-redux";
+import { RootState } from "../store";
 
 export const UserDetails = () => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [editProfile, setEditProfile] = useState<boolean>(false);
-  const [userInfo, setUserInfo] = useState<DocumentData | null>({});
+  const [userInfo, setUserInfo] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [friends, setFriends] = useState<User[]>([]);
+  const [getUserById,{isLoading:isFetching,isError:isUserError}]=useLazyGetUserByIdQuery()
+  const [fetchFriends,{isLoading:isFetchingUser,isError:isFriendsError}]=useLazyGetFriendsQuery()
+  
 
-  const user = auth.currentUser;
+  const user= useSelector((state: RootState) => state.auth.user);
+  console.log(user,"user")
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -39,23 +45,57 @@ export const UserDetails = () => {
     return () => clearTimeout(timer);
   }, []);
 
+  // useEffect(() => {
+  //   const getUserFn = async () => {
+  //     if (!user || !user.uid) {
+  //       console.log("no user")
+  //       return
+  //     };
+  //     setIsLoading(true); // Start loading when fetching user
+
+  //     try {
+  //       console.log("Triggering API call...");
+  //       const userDetails = await getUserById(user.uid);
+  //       console.log(userDetails,"user Details")
+  //       setUserInfo(userDetails);
+  //     } catch (error) {
+  //       console.error("Error fetching user data:", error);
+  //     } finally {
+  //       setIsLoading(false); // Stop loader after fetching
+  //     }
+  //   };
+
+  //   getUserFn();
+  // }, [user, editProfile]); // Add `editProfile` dependency to refetch after closing the modal
+
   useEffect(() => {
     const getUserFn = async () => {
-      if (!user || !user.uid) return;
-      setIsLoading(true); // Start loading when fetching user
+        if (!user || !user.uid) {
+            console.log("No user found");
+            return;
+        }
 
-      try {
-        const userDetails = await getUser(user.uid);
-        setUserInfo(userDetails);
-      } catch (error) {
-        console.error("Error fetching user data:", error);
-      } finally {
-        setIsLoading(false); // Stop loader after fetching
-      }
+        setIsLoading(true); // Start loading when fetching user
+
+        try {
+            console.log("Triggering API call...");
+            
+            const { data, error } = await getUserById(user.uid); // Correct way to trigger
+            if (error) {
+                console.error("Error fetching user:", error);
+            } else {
+                console.log("User details:", data);
+                setUserInfo(data); // Store data correctly
+            }
+        } catch (error) {
+            console.error("Unexpected error fetching user:", error);
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     getUserFn();
-  }, [user, editProfile]); // Add `editProfile` dependency to refetch after closing the modal
+}, [user, editProfile]);
 
   useEffect(() => {
     if (containerRef.current) {
@@ -64,16 +104,41 @@ export const UserDetails = () => {
   }, []);
 
   useEffect(() => {
+    if (!user || !user.uid) {
+      console.log("No user found");
+      return;
+  }
     const loadFriends = async () => {
-      const friendsData = await fetchFriends();
-      setFriends(friendsData);
+      try {
+        console.log("Fetching friends...");
+        const { data, error } = await fetchFriends(user.uid); // Pass userId correctly
+
+        if (error) {
+          console.error("Error fetching friends:", error);
+        } else {
+          console.log("Friends data:", data);
+          setFriends(Array.isArray(data?.friends) ? data.friends : [])
+        }
+      } catch (error) {
+        console.error("Unexpected error fetching friends:", error);
+      }
     };
 
     loadFriends();
   }, []);
+  
 
-  if (isLoading) {
+  if (isLoading||isFetching||isFetchingUser) {
     return <Loader />;
+  }
+
+  if (isUserError || isFriendsError) {
+    return (
+      <Container className="text-center mt-5">
+        <h2 className="text-danger">Error loading user data.</h2>
+        <p>Please try again later.</p>
+      </Container>
+    );
   }
 
   const showEditModal = () => {
@@ -102,13 +167,13 @@ export const UserDetails = () => {
         <Row className="align-items-center">
           <Col md={3} className="text-center">
             <img
-              src={userInfo?.imageUrl}
+              src={userInfo?.profilePhoto}
               alt="Profile"
               className="rounded-circle img-fluid"
             />
           </Col>
           <Col md={6}>
-            <h2>{userInfo?.name}</h2>
+            <h2>{userInfo?.fullName}</h2>
             <p className="text-muted">{userInfo?.email}</p>
             <p>"Passionate about building impactful solutions."</p>
           </Col>
@@ -149,24 +214,33 @@ export const UserDetails = () => {
               LOCATION
             </h4>
             <p>
-              Country: {userInfo?.country},{userInfo?.homeTown}
+              Country: {userInfo?.country},{userInfo?.hometown}
             </p>
           </Card>
         </Col>
         <Col md={4}>
-          <Card
-            style={{ backgroundColor: "#AFDBF5" }}
-            className="p-3 mb-4 shadow-sm hover-card"
-          >
-            <h4>
-              <FaPaintBrush size={40} color=" #60a5fa" />
-              Hobbies
-            </h4>
-            <p>{userInfo?.Interests} </p>
-            {/* <p>Crochet</p>
-            <p>Hockey</p> */}
-          </Card>
-        </Col>
+  <Card
+    style={{ backgroundColor: "#AFDBF5" }}
+    className="p-3 mb-4 shadow-sm hover-card"
+  >
+    <h4>
+      <FaPaintBrush size={40} color=" #60a5fa" />
+      Hobbies
+    </h4>
+    {Array.isArray(userInfo?.interest) ? (
+      userInfo?.interest.length > 0 ? (
+        userInfo.interest.map((hobby, index) => (
+          <p key={index}>{hobby}</p>
+        ))
+      ) : (
+        <p className="text-muted">No hobbies listed</p>
+      )
+    ) : (
+      <p>{userInfo?.interest || "No hobbies listed"}</p>
+    )}
+  </Card>
+</Col>
+
       </Row>
       {/* Recent Activity */}
       <Card
@@ -174,7 +248,7 @@ export const UserDetails = () => {
         className="mt-4 p-3 shadow-sm"
       >
         <div className="container mt-4">
-          <h2 className="mb-3 text-center"> {user?.displayName}'s friends</h2>
+          <h2 className="mb-3 text-center"> {user?.fullName}'s friends</h2>
           {friends.length === 0 ? (
             <p className="text-muted text-center">
               You have not added any friends yet
@@ -182,7 +256,7 @@ export const UserDetails = () => {
           ) : (
             <div className="row">
               {friends.map((friend) => (
-                <div key={friend.id} className="col-md-4 mb-4">
+                <div key={friend._id} className="col-md-4 mb-4">
                   {/* Bootstrap Grid System */}
                   <Card
                     className="p-3 shadow-sm profile-img"
@@ -192,14 +266,14 @@ export const UserDetails = () => {
                     }}
                   >
                     <img
-                      src={friend?.imageUrl}
+                      src={friend?.profilePhoto}
                       width="100px"
                       height="100px"
                       style={{ borderRadius: "100px", alignSelf: "center" }}
                     />
                     <h5 className="mb-2">
                       <PersonFill className="me-2" color="blue" />
-                      {friend.name}
+                      {friend.fullName}
                     </h5>
                     <p className="text-muted" style={{ fontSize: "13px" }}>
                       <EnvelopeFill className="me-2" color="blue" />

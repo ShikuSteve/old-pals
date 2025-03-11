@@ -5,14 +5,22 @@ import { RootState } from "..";
 export const CODE_VERIFIER_KEY = "codeVerifier";
 
 export interface User {
+  uid: string;
   accessToken: string;
   refreshToken: string;
   email: string;
   fullName: string;
+  age?: string;
+  country?: string;
+  countryCode?: string;
+  school?: string;
+  interest?: string;
+  homeTown?:string;
   phoneNumber?: string;
   imageUrl?: string;
   refreshTknExpTime: number;
   accessTknExpTime: number;
+  profilePicture?: File | null;
 }
 
 interface AuthState {
@@ -27,6 +35,11 @@ const authSlice = createSlice({
   reducers: {
     setUser(state, action: PayloadAction<User>) {
       state.user = action.payload;
+    },
+    updateUser(state, action: PayloadAction<Partial<User>>) {
+      if (state.user) {
+        state.user = { ...state.user, ...action.payload };
+      }
     },
     setIsLoggedIn(state, action: PayloadAction<boolean>) {
       state.isLoggedIn = action.payload;
@@ -47,5 +60,5 @@ const selectAuth = (state: RootState) => state.auth;
 
 export const getUser = () => createSelector([selectAuth], (auth) => auth.user);
 
-export const { setUser, setIsLoggedIn, resetAuth } = authSlice.actions;
+export const { setUser, setIsLoggedIn, resetAuth,updateUser } = authSlice.actions;
 export const authReducer = authSlice.reducer;

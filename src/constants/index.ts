@@ -1,0 +1,1 @@
+export const PROJECT_DOMAIN = window.location.origin.replace(/5173/g, "4000");
