@@ -1,29 +1,12 @@
 import React, { useState, useRef, useEffect } from "react";
 import io, { Socket } from "socket.io-client";
-import {
-  Container,
-  Row,
-  Col,
-  Card,
-  Form,
-  Button,
-  Modal,
-} from "react-bootstrap";
-import {
-  Plus,
-  Send,
-  EmojiSmile,
-  FileEarmark,
-  Image,
-  Camera,
-  Fullscreen,
-  FullscreenExit,
-} from "react-bootstrap-icons";
+import { Container, Row, Col, Card, Form, Button, Modal } from "react-bootstrap";
+import { Plus, Send, EmojiSmile, FileEarmark, Image, Camera, Fullscreen, FullscreenExit } from "react-bootstrap-icons";
 import EmojiPicker, { EmojiClickData } from "emoji-picker-react";
 import { v4 as uuidv4 } from "uuid";
 import { useSelector } from "react-redux";
 import { RootState } from "../store";
-import Avatar from "./avatar";;
+import Avatar from "./avatar";
 import { VoiceRecorder } from "./voice-recorder";
 import { useDeleteMessagesMutation, useLazyGetFriendsQuery, useLazyGetMessagesQuery, useSendMessageMutation } from "../api/public";
 import { DummyUser, Message } from "../utils/types";
@@ -31,7 +14,6 @@ import { groupMessagesByDate } from "../utils/date";
 import NoChatsMessage from "./no-chats";
 import DeleteMessage from "./delete";
 import { getLastMessagePreview } from "../utils/last-message";
-
 
 const backgroundStyle: React.CSSProperties = {
   width: "100vw",
@@ -59,9 +41,6 @@ const dataURLtoBlob = (dataURL: string) => {
   return new Blob([ab], { type: mimeString });
 };
 
-
-
-
 const MessagingPage: React.FC = () => {
   const [message, setMessage] = useState("");
   const [updatedMessages, setUpdatedMessages] = useState<Message[]>([]);
@@ -72,72 +51,56 @@ const MessagingPage: React.FC = () => {
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [isEditingImage, setIsEditingImage] = useState(false);
   const [previewFile, setPreviewFile] = useState<File | null>(null);
-  const [previewFileType, setPreviewFileType] = useState<
-    "image" | "video" | "document" | "audio"|null
-  >(null);
+  const [previewFileType, setPreviewFileType] = useState<"image" | "video" | "document" | "audio" | null>(null);
   const [editedImage, setEditedImage] = useState<string | null>(null);
   const [textOverlay, setTextOverlay] = useState("");
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
-  const [friends, setFriends] = useState<DummyUser []>([]);
+  const [friends, setFriends] = useState<DummyUser[]>([]);
   const [activeChatUser, setActiveChatUser] = useState<DummyUser | null>(null);
-  // Modal viewer state
   const [viewerModalVisible, setViewerModalVisible] = useState(false);
   const [viewerContent, setViewerContent] = useState<string | null>(null);
-  const [viewerType, setViewerType] = useState<
-    "image" | "video" | "document" | null
-  >(null);
+  const [viewerType, setViewerType] = useState<"image" | "video" | "document" | null>(null);
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [isCameraOpen, setIsCameraOpen] = useState(false);
-  
 
   const emojiPickerRef = useRef<HTMLDivElement>(null);
   const attachmentMenuRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
-    const [fetchFriends,{isError:isFriendsError}]=useLazyGetFriendsQuery()
-    const[sendMessage]=useSendMessageMutation()
-    const[fetchMessages,{isLoading,isError}]=useLazyGetMessagesQuery()
-    const [deleteMessages] = useDeleteMessagesMutation();
-    const [isFetchingUser, setIsFetchingUser] = useState(false);
-  // Create a ref to store the socket instanceF
+  const [fetchFriends, { isError: isFriendsError }] = useLazyGetFriendsQuery();
+  const [sendMessage] = useSendMessageMutation();
+  const [fetchMessages, { isLoading, isError }] = useLazyGetMessagesQuery();
+  const [deleteMessages] = useDeleteMessagesMutation();
+  const [isFetchingUser, setIsFetchingUser] = useState(false);
   const socketRef = useRef<Socket | null>(null);
 
- 
-
-  // Get the current logged in user from Redux store
   const currentUser = useSelector((state: RootState) => state.auth.user);
-  console.log("current users",currentUser)
 
-  
-
-  // Fetch friends when the component mounts
   useEffect(() => {
     const fetchData = async () => {
       if (!currentUser) return;
-  
-      setIsFetchingUser(true); // Start loading
-  
+
+      setIsFetchingUser(true);
+
       try {
         const { data, error } = await fetchFriends(currentUser.uid);
-  
+
         if (error) {
           console.error("Error fetching friends:", error);
         } else {
           const friendsList = data?.friends || [];
-  
+
           const friendsWithLastMessages = await Promise.all(
             friendsList.map(async (friend: DummyUser) => {
               try {
                 const roomName = [currentUser.uid, friend._id].sort().join("_");
                 const messagesResponse = await fetchMessages(roomName);
-  
+
                 const lastMessage =
                   messagesResponse.data?.length > 0
                     ? messagesResponse.data[messagesResponse.data.length - 1]
                     : null;
 
-             
-  
                 return {
                   ...friend,
                   lastMessage: {
@@ -146,8 +109,7 @@ const MessagingPage: React.FC = () => {
                       : "No messages yet",
                     timestamp: lastMessage ? new Date(lastMessage.timestamp) : null,
                   },
-                  unread:0
-                  
+                  unread: 0
                 };
               } catch (err) {
                 return {
@@ -160,170 +122,130 @@ const MessagingPage: React.FC = () => {
               }
             })
           );
-  
+
           setFriends(friendsWithLastMessages);
         }
       } catch (err) {
         console.error("Unexpected error:", err);
       } finally {
-        setIsFetchingUser(false); // Stop loading
+        setIsFetchingUser(false);
       }
     };
-  
+
     fetchData();
   }, [currentUser, fetchFriends]);
-  
 
-  
-  // Filter out the current logged in user from the conversation list
   const conversationUsers = friends.filter(
-    (user) => user.email !== currentUser ?.email
+    (user) => user.email !== currentUser?.email
   );
 
+  useEffect(() => {
+    if (activeChatUser && currentUser) {
+      const roomName = [currentUser.uid, activeChatUser._id].sort().join("_");
 
-useEffect(() => {
-  if (activeChatUser  && currentUser ) {
-    console.log("Current User ID:", currentUser?.uid);
-console.log("Active Chat User ID:", activeChatUser?._id);
+      const loadMessages = async () => {
+        try {
+          const response = await fetchMessages(roomName);
 
-    const roomName = [currentUser.uid, activeChatUser._id].sort().join("_");
-    console.log(roomName,"roomname")
+          if ("data" in response && response.data) {
+            const hasMessages = response.data.length > 0;
 
-    // Fetch messages for the room when it changes
-    const loadMessages = async () => {
-      try {
-        const response = await fetchMessages(roomName);
-        
-        if ("data" in response && response.data) {
-          // Always check if messages exist before accessing
-          const hasMessages = response.data.length > 0;
-          
-          setUpdatedMessages(hasMessages ? response.data : []);
-    
-          // Only update last message if messages exist
-          if (hasMessages) {
-            const lastMessage = response.data[response.data.length - 1];
-            setFriends(prevFriends => prevFriends.map(friend => 
-              friend._id === activeChatUser?._id ? { 
-                ...friend, 
-                lastMessage: {
-                  preview: getLastMessagePreview(lastMessage),
-                  timestamp: new Date(lastMessage.timestamp)
-                }
-              } : friend
-            ));
+            setUpdatedMessages(hasMessages ? response.data : []);
+
+            if (hasMessages) {
+              const lastMessage = response.data[response.data.length - 1];
+              setFriends(prevFriends => prevFriends.map(friend =>
+                friend._id === activeChatUser?._id ? {
+                  ...friend,
+                  lastMessage: {
+                    preview: getLastMessagePreview(lastMessage),
+                    timestamp: new Date(lastMessage.timestamp)
+                  }
+                } : friend
+              ));
+            }
           }
+        } catch (error) {
+          console.error("Error fetching messages:", error);
         }
-      } catch (error) {
-        console.error("Error fetching messages:", error);
-      }
-    };
-    
+      };
 
-    loadMessages();
+      loadMessages();
 
-    // Join the room
-    socketRef.current = io("http://localhost:4000");
-    socketRef.current.on("connect", () => {
-          console.log("Connected to socket server!");
-        });
-    socketRef.current!.emit("joinRoom", roomName);
+      socketRef.current = io("http://localhost:4000");
+      socketRef.current.on("connect", () => {
+        console.log("Connected to socket server!");
+      });
+      socketRef.current!.emit("joinRoom", roomName);
 
-    // Listen for new messages
-    socketRef.current!.on("newMessage", (incomingMessage: Message) => {
-      setUpdatedMessages((prevMessages) => [...prevMessages, incomingMessage]);
-        // Update unread count if message is from another user and chat is not active
+      socketRef.current!.on("newMessage", (incomingMessage: Message) => {
+        setUpdatedMessages((prevMessages) => [...prevMessages, incomingMessage]);
         if (
           incomingMessage.senderId !== currentUser.uid &&
           activeChatUser._id !== incomingMessage.senderId
         ) {
-          setFriends(prevFriends => prevFriends.map(friend => 
-            friend._id === incomingMessage.senderId ? 
-              { ...friend, unread: (friend.unread|| 0) + 1 } : 
+          setFriends(prevFriends => prevFriends.map(friend =>
+            friend._id === incomingMessage.senderId ?
+              { ...friend, unread: (friend.unread || 0) + 1 } :
               friend
           ));
         }
-    });
+      });
 
-    return () => {
-      socketRef.current!.emit("leaveRoom", roomName);
-      socketRef.current!.off("newMessage");
-    };
-  }
-}, [activeChatUser , currentUser ]);
+      return () => {
+        socketRef.current!.emit("leaveRoom", roomName);
+        socketRef.current!.off("newMessage");
+      };
+    }
+  }, [activeChatUser, currentUser]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setMessage(e.target.value);
     setIsTyping(e.target.value.trim() !== "");
   };
 
-  
   const handleSendMessage = async () => {
-    console.log("sending message")
     let newMsg: Message | null = null;
     const senderEmail = currentUser?.email;
-    const senderId=currentUser?.uid
+    const senderId = currentUser?.uid;
     const timestamp = new Date();
     const id = uuidv4();
-    
-  
-    if (!senderEmail || !senderId||!activeChatUser) return;
-    console.log("Authenticated User UID:", currentUser?.uid);
+
+    if (!senderEmail || !senderId || !activeChatUser) return;
     const roomName = [currentUser.uid, activeChatUser._id].sort().join("_");
 
-    console.log("Current User:", currentUser );
-    console.log("Active Chat User:", activeChatUser?._id );
-    console.log("Message State:", message);
-    console.log("Trimmed Message:", message.trim());
-    console.log("Captured Image:", capturedImage);
-    console.log("Edited Image:", editedImage);
-    console.log("Preview File:", previewFile);
-    console.log("Audio Blob:", audioBlob);
-    
-  
     if (editedImage) {
-      console.log("Handling edited image");
-      // Handle edited image
       newMsg = {
         id,
-        // senderEmail,
         senderId,
         timestamp,
         type: "image",
         content: editedImage,
-        caption: message, 
-        room:roomName as string
+        caption: message,
+        room: roomName as string
       };
-      setEditedImage(null); // Clear the edited image state
-      setTextOverlay(""); // Clear the text overlay
+      setEditedImage(null);
+      setTextOverlay("");
     } else if (capturedImage) {
-      console.log("Handling captured image");
-      // Handle captured image
       newMsg = {
         id,
-        // senderEmail,
         senderId,
         timestamp,
         type: "image",
         content: capturedImage,
         caption: message,
-        room:roomName as string
+        room: roomName as string
       };
-      setCapturedImage(null); // Clear the captured image state
-    }
-    else if (previewFile) {
-      console.log("Handling preview file");
-      const captionText = message.trim() 
-      ? `${previewFile.name}\n${message}` 
-      : previewFile.name;
-      
+      setCapturedImage(null);
+    } else if (previewFile) {
+      const captionText = message.trim()
+        ? `${previewFile.name}\n${message}`
+        : previewFile.name;
 
-      // Upload the file using FormData instead of converting to Data URL
       const formData = new FormData();
       formData.append("file", previewFile);
-  
+
       try {
-        // Replace '/upload' with your actual upload endpoint URL
         const response = await fetch("http://localhost:4000/upload", {
           method: "POST",
           body: formData,
@@ -334,16 +256,14 @@ console.log("Active Chat User ID:", activeChatUser?._id);
         const { fileUrl } = await response.json();
         newMsg = {
           id,
-          // senderEmail,
           senderId,
           timestamp,
           type: previewFileType === "image" ? "image" : "file",
-          content: fileUrl, // Use the file URL returned from the server
-          caption: captionText, // Use the file name as the caption
-          room:roomName as string
+          content: fileUrl,
+          caption: captionText,
+          room: roomName as string
         };
-  
-        // Clear states
+
         setMessage("");
         setIsTyping(false);
         setPreviewFile(null);
@@ -353,100 +273,85 @@ console.log("Active Chat User ID:", activeChatUser?._id);
         console.error("Error uploading file:", error);
         return;
       }
-    }else if (audioBlob) {
-      console.log("Handling audio blob");
-      // Handle audio message
+    } else if (audioBlob) {
       const base64Audio = await blobToBase64(audioBlob);
       newMsg = {
         id,
-        // senderEmail,
         senderId,
         timestamp,
         type: "audio",
         content: base64Audio,
-        room:roomName as string
+        room: roomName as string
       };
       setAudioBlob(null);
-    setPreviewFile(null);
-    setPreviewFileType(null);
-     
-    }else if (message.trim() !== "") {
-      console.log("Message before sending:", message);
-      // Handle text message
+      setPreviewFile(null);
+      setPreviewFileType(null);
+    } else if (message.trim() !== "") {
       newMsg = {
         id,
-        // senderEmail,
         senderId,
         timestamp,
         type: "text",
         content: message,
-        room:roomName as string
+        room: roomName as string
       };
-      console.log("Text message constructed:", newMsg)
       setMessage("");
       setIsTyping(false);
-    }else {
-      console.log("Message is empty or only whitespace."); // Log if the message is empty
-  }
-
-  socketRef.current?.emit("sendMessage",newMsg)
-  
-  try {
-    if (newMsg && newMsg.room) {
-      await sendMessage(newMsg);
-
-      setFriends(prevFriends => prevFriends.map(friend => 
-        friend._id === activeChatUser._id ? { 
-          ...friend, 
-          lastMessage: {
-            preview: getLastMessagePreview(newMsg),
-            timestamp: newMsg.timestamp
-          }
-        } : friend
-      ));
-
     } else {
-      console.error("Message object is missing required fields:", newMsg);
+      console.log("Message is empty or only whitespace.");
     }
-    
-    
-    setMessage(""); // Clear the input field
-  } catch (error) {
-    console.error("Error sending message:", error);
-  }
+
+    socketRef.current?.emit("sendMessage", newMsg);
+
+    try {
+      if (newMsg && newMsg.room) {
+        await sendMessage(newMsg);
+
+        setFriends(prevFriends => prevFriends.map(friend =>
+          friend._id === activeChatUser._id ? {
+            ...friend,
+            lastMessage: {
+              preview: getLastMessagePreview(newMsg),
+              timestamp: newMsg.timestamp
+            }
+          } : friend
+        ));
+      } else {
+        console.error("Message object is missing required fields:", newMsg);
+      }
+
+      setMessage("");
+    } catch (error) {
+      console.error("Error sending message:", error);
+    }
   };
-  
-  
+
   const handleEmojiClick = (emojiObject: EmojiClickData) => {
     setMessage((prevMessage) => prevMessage + emojiObject.emoji);
   };
 
   const handleAudioRecorded = (blob: Blob) => {
     setAudioBlob(blob);
-    setPreviewFileType("audio")
-   };
+    setPreviewFileType("audio");
+  };
 
-   const handleSelectFriend = (user: DummyUser) => {
+  const handleSelectFriend = (user: DummyUser) => {
     setActiveChatUser(user);
-    setFriends(prevFriends => prevFriends.map(friend => 
+    setFriends(prevFriends => prevFriends.map(friend =>
       friend._id === user._id ? { ...friend, unread: 0 } : friend
     ));
   };
-  
 
   const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (files && files.length > 0) {
       const file = files[0];
 
-       // Optional: File size validation (example: 5MB max)
-    const maxFileSize = 5 * 1024 * 1024; // 5MB
-    if (file.size > maxFileSize) {
-      alert("File size is too large. Please select a file smaller than 5MB.");
-      return;
-    }
-
-    console.log("File selected:", file); // Debugging
+      const maxFileSize = 5 * 1024 * 1024;
+      if (file.size > maxFileSize) {
+        alert("File size is too large. Please select a file smaller than 5MB.");
+        return;
+      }
 
       setPreviewFile(file);
 
@@ -502,7 +407,7 @@ console.log("Active Chat User ID:", activeChatUser?._id);
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: true });
       setCameraStream(stream);
-      setIsCameraOpen(true)
+      setIsCameraOpen(true);
     } catch (error) {
       console.error("Error accessing camera:", error);
       alert(
@@ -528,23 +433,18 @@ console.log("Active Chat User ID:", activeChatUser?._id);
       if (ctx) {
         ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
         const dataUrl = canvas.toDataURL("image/png");
-  
-        // Convert data URL to a File and set preview in the chat
+
         const file = new File([dataURLtoBlob(dataUrl)], "captured_image.png", {
           type: "image/png",
         });
         setPreviewFile(file);
         setPreviewFileType("image");
-  
-        // Close or hide the inline camera preview
+
         closeCamera();
       }
     }
   };
-  
-  
 
-  // Modal viewer functions
   const openViewer = (url: string, type: "image" | "video" | "document") => {
     setViewerContent(url);
     setViewerType(type);
@@ -555,7 +455,7 @@ console.log("Active Chat User ID:", activeChatUser?._id);
     setViewerModalVisible(false);
     setViewerContent(null);
     setViewerType(null);
-    setIsFullScreen(false); // reset full screen state when closing
+    setIsFullScreen(false);
   };
 
   useEffect(() => {
@@ -591,13 +491,12 @@ console.log("Active Chat User ID:", activeChatUser?._id);
 
   const handleDeleteMessage = async (messageId: string) => {
     try {
-      await deleteMessages(messageId).unwrap(); 
-      setUpdatedMessages((prevMessages) => prevMessages.filter(msg => msg.id !== messageId)); 
+      await deleteMessages(messageId).unwrap();
+      setUpdatedMessages((prevMessages) => prevMessages.filter(msg => msg.id !== messageId));
     } catch (error) {
       console.error("Error deleting message:", error);
     }
   };
-  console.log(isFetchingUser,"loading user")
 
   return (
     <Container
@@ -612,22 +511,21 @@ console.log("Active Chat User ID:", activeChatUser?._id);
           width: "90%",
           maxWidth: "1200px",
           borderRadius: "10px",
-          // overflow: "hidden",
           boxShadow: "0 1px 3px rgba(0, 0, 0, 0.1)",
         }}
       >
         {/* Left Sidebar: Conversation List */}
         <Col
           md={4}
-          style={{ backgroundColor: "#ffffff ", borderRight: "1px solid #ddd" }}
+          style={{ backgroundColor: "#ffffff", borderRight: "1px solid #ddd" }}
         >
           <div
             style={{
               padding: "10px",
               backgroundColor: "#3E7BE7",
               color: "#fff",
-              display: "flex",             
-              alignItems: "center", 
+              display: "flex",
+              alignItems: "center",
               justifyContent: "space-between",
             }}
           >
@@ -640,28 +538,25 @@ console.log("Active Chat User ID:", activeChatUser?._id);
               backgroundColor: "#ffffff",
             }}
           >
-            {
-            isFetchingUser?(
+            {isFetchingUser ? (
               <p style={{ padding: "10px" }}>Loading users...</p>
-            ):(!isFetchingUser&&isFriendsError)?(
+            ) : (!isFetchingUser && isFriendsError) ? (
               <p style={{ padding: "10px", color: "red" }}>Error fetching users.</p>
-            ):(!isFetchingUser&&conversationUsers.length === 0 )? (
-              <div style={{ 
-                padding: "20px", 
+            ) : (!isFetchingUser && conversationUsers.length === 0) ? (
+              <div style={{
+                padding: "20px",
                 textAlign: "center",
                 color: "#666"
               }}>
-              <p style={{ padding: "10px" }}>
-                {friends.length === 0
-                  ?  "No other users" : "No friends found"}
-              </p>
+                <p style={{ padding: "10px" }}>
+                  {friends.length === 0
+                    ? "No other users" : "No friends found"}
+                </p>
               </div>
             ) : (
-              conversationUsers.sort((a,b)=>{
+              conversationUsers.sort((a, b) => {
                 const aTime = a.lastMessage?.timestamp?.getTime() || 0;
                 const bTime = b.lastMessage?.timestamp?.getTime() || 0;
-                
-                // Descending order (newest first)
                 return bTime - aTime;
               }).map((user) => (
                 <Card
@@ -688,37 +583,36 @@ console.log("Active Chat User ID:", activeChatUser?._id);
                   <Card.Body>
                     <div style={{ display: "flex", alignItems: "center" }}>
                       <Avatar src={user.profilePhoto} size={40} />
-                      <div style={{ marginLeft: "10px",flexGrow:1 }}>
-                      <div style={{ display: "flex", justifyContent: "space-between" }}>
-            <h6 style={{ margin: 0 }}>{user.fullName}</h6>
-            {(user.unread ?? 0)> 0 && (
-              <span style={{
-                backgroundColor: "#3E7BE7",
-                color: "white",
-                borderRadius: "50%",
-                width: "20px",
-                height: "20px",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontSize: "0.75rem",
-                marginLeft: "8px"
-              }}>
-                {user.unread??0}
-              </span>
-            )}
-          </div>
-                        
+                      <div style={{ marginLeft: "10px", flexGrow: 1 }}>
+                        <div style={{ display: "flex", justifyContent: "space-between" }}>
+                          <h6 style={{ margin: 0 }}>{user.fullName}</h6>
+                          {(user.unread ?? 0) > 0 && (
+                            <span style={{
+                              backgroundColor: "#3E7BE7",
+                              color: "white",
+                              borderRadius: "50%",
+                              width: "20px",
+                              height: "20px",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              fontSize: "0.75rem",
+                              marginLeft: "8px"
+                            }}>
+                              {user.unread ?? 0}
+                            </span>
+                          )}
+                        </div>
                         <small style={{ color: "#666" }}>
-                          {user.lastMessage?.preview||"No Message yet"}
+                          {user.lastMessage?.preview || "No Message yet"}
                           {user.lastMessage?.timestamp && (
-                <span style={{ marginLeft: "8px", fontSize: "0.75em" }}>
-                  {new Date(user.lastMessage.timestamp).toLocaleTimeString([],{
-                     hour: '2-digit',
-                    minute: '2-digit'
-                  })}
-                </span>
-              )}
+                            <span style={{ marginLeft: "8px", fontSize: "0.75em" }}>
+                              {new Date(user.lastMessage.timestamp).toLocaleTimeString([], {
+                                hour: '2-digit',
+                                minute: '2-digit'
+                              })}
+                            </span>
+                          )}
                         </small>
                       </div>
                     </div>
@@ -751,242 +645,232 @@ console.log("Active Chat User ID:", activeChatUser?._id);
                   color: "#fff",
                 }}
               >
-{activeChatUser ? (
-  <div style={{ display: "flex", alignItems: "center" }}>
-    <Avatar src={activeChatUser.profilePhoto} size={40} />
-    <span style={{ marginLeft: "10px" }}>Chat with {activeChatUser.fullName}</span>
-  </div>
-) : (
-  "Select a conversation"
-)}
-
+                {activeChatUser ? (
+                  <div style={{ display: "flex", alignItems: "center" }}>
+                    <Avatar src={activeChatUser.profilePhoto} size={40} />
+                    <span style={{ marginLeft: "10px" }}>Chat with {activeChatUser.fullName}</span>
+                  </div>
+                ) : (
+                  "Select a conversation"
+                )}
               </div>
             </h6>
           </div>
           <div
             style={{
               padding: "10px",
-      flex: 1,
-      overflowY: "auto",
-      backgroundColor: "#ece5dd",
-      
-  }}
-  >
-    {isLoading ?(
-       <p style={{ padding: "10px" }}>Loading messages...</p>
-    ):isError ?(
-      <p style={{ padding: "10px", color: "red" }}>Failed to load messages.</p>
-    ):updatedMessages.length === 0 ? (
-      <NoChatsMessage activeChatUser={activeChatUser}/>
-    ) :
-    (Object.entries(groupMessagesByDate(updatedMessages)).map(([dateKey, messages]) => (
-    <div key={dateKey}>
-      {/* Date separator */}
-      <div style={{ 
-        display: 'flex', 
-        alignItems: 'center', 
-        margin: '20px 0',
-        padding: '0 10px'
-      }}>
-        <div style={{ flex: 1, borderBottom: '1px solid #dcdcdc' }} />
-        <span style={{ 
-          margin: '0 10px', 
-          color: '#666',
-          fontSize: '0.75rem',
-          fontWeight: 500,
-          textTransform: 'uppercase'
-        }}>
-          {dateKey}
-        </span>
-        <div style={{ flex: 1, borderBottom: '1px solid #dcdcdc' }} />
-      </div>    
-            {messages.map((msg, index) => (
-              <div
-                key={index}
-                style={{
-                  marginBottom: "10px",
-                  textAlign:
-                    msg.senderId === currentUser?.uid ? "right" : "left",
-                }}
-              >
-  {msg.type === "text" && (
-  <div
-    style={{
-      display: "inline-block",
-      padding: "8px 12px",
-      backgroundColor: msg.senderId === currentUser!.uid ? "#3E7BE7" : "#D6E6FF", // Sender: Blue, Receiver: Pastel Blue
-      color: msg.senderId === currentUser!.uid ? "white" : "black", // Text color
-      borderRadius: msg.senderId === currentUser!.uid ? "10px 10px 0 10px" : "10px 10px 10px 0",
-      maxWidth: "60%",
-      boxShadow: "0 1px 1px rgba(0, 0, 0, 0.1)",
-      alignSelf: msg.senderId === currentUser!.uid ? "flex-end" : "flex-start",
-    }}
-  >
-    <p style={{ margin: 0 }}>{msg.content}</p>
-    <DeleteMessage messageId={msg.id} onDelete={handleDeleteMessage} />
-  </div>
-)}
-
-
-                {msg.type === "image" && (
-                  <div
-                    style={{
-                      display: "inline-block",
-                      padding: "8px 12px",
-                      backgroundColor: "#ffffff",
-                      borderRadius: "10px 10px 10px 0",
-                      border: "1px solid #ddd",
-                      maxWidth: "200px",
-                      width:"auto",
-                      boxShadow: "0 1px 1px rgba(0, 0, 0, 0.1)",
-                    }}
-                  >
-                    <img
-                      src={msg.content}
-                      alt="Sent"
-                      style={{
-                        maxWidth: "100%",
-                        borderRadius: "5px",
-                        cursor: "pointer",
-                      }}
-                      onClick={() => openViewer(msg.content, "image")}
-                    />
-                   {msg.caption && msg.caption.split("\n").length > 1 && (
-      <div
-        style={{
-          marginTop: "0px",
-          padding: "8px",
-          backgroundColor: "#f0f0f0", // Light background for the text
-          borderRadius: "5px",
-        }}
-      >
-        <p
-          style={{
-            margin: 0,
-            fontSize: "0.875rem",
-            color: "#666",
-            whiteSpace: "pre-line", // Preserve line breaks in the caption
-          }}
-        >
-          {msg.caption.split("\n").slice(1).join("\n")} {/* Display the additional text */}
-        </p>
-      </div>
-      
-    )}
-    <DeleteMessage messageId={msg.id} onDelete={handleDeleteMessage} />
+              flex: 1,
+              overflowY: "auto",
+              backgroundColor: "#ece5dd",
+            }}
+          >
+            {isLoading ? (
+              <p style={{ padding: "10px" }}>Loading messages...</p>
+            ) : isError ? (
+              <p style={{ padding: "10px", color: "red" }}>Failed to load messages.</p>
+            ) : updatedMessages.length === 0 ? (
+              <NoChatsMessage activeChatUser={activeChatUser} />
+            ) :
+              (Object.entries(groupMessagesByDate(updatedMessages)).map(([dateKey, messages]) => (
+                <div key={dateKey}>
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    margin: '20px 0',
+                    padding: '0 10px'
+                  }}>
+                    <div style={{ flex: 1, borderBottom: '1px solid #dcdcdc' }} />
+                    <span style={{
+                      margin: '0 10px',
+                      color: '#666',
+                      fontSize: '0.75rem',
+                      fontWeight: 500,
+                      textTransform: 'uppercase'
+                    }}>
+                      {dateKey}
+                    </span>
+                    <div style={{ flex: 1, borderBottom: '1px solid #dcdcdc' }} />
                   </div>
-                )}
-                {msg.type === "audio" && (
-  <div
-    style={{
-      display: "inline-block",
-      padding: "8px 12px",
-      backgroundColor: "#ffffff",
-      borderRadius: "10px 10px 10px 0",
-      border: "1px solid #ddd",
-      maxWidth: "300px",
-      boxShadow: "0 1px 1px rgba(0, 0, 0, 0.1)",
-    }}
-  > 
-    <audio controls src={msg.content}    style={{
-        maxWidth: "100%",      
-        display: "block",      
-        boxSizing: "border-box",
-      }}/>
-      <DeleteMessage messageId={msg.id} onDelete={handleDeleteMessage} />
-  </div>
-)}
-
-                {msg.type === "file" && (
-                  <div
-                    style={{
-                      display: "inline-block",
-                      padding: "8px 12px",
-                      backgroundColor: "#ffffff",
-                      borderRadius: "10px 10px 10px 0",
-                      border: "1px solid #ddd",
-                      maxWidth: "300px",
-                      width:"auto",
-                      boxShadow: "0 1px 1px rgba(0, 0, 0, 0.1)",
-                      cursor: "pointer",
-                    }}
-                    onClick={() => {
-                      const type = msg.content.startsWith("data:image/")
-                        ? "image"
-                        : msg.content.startsWith("data:video/")
-                        ? "video"
-                        : "document";
-                      openViewer(msg.content, type);
-                    }}
-                  >
-                    {msg.content.startsWith("data:image/") ? (
-                      <img
-                        src={msg.content}
-                        alt="File Preview"
-                        style={{ maxWidth: "100%", borderRadius: "5px" }}
-                      />
-                    ) : msg.content.startsWith("data:video/") ? (
-                      <video
-                        controls
-                        src={msg.content}
-                        style={{ maxWidth: "100%", borderRadius: "5px" }}
-                      />
-                    ) : (
-                      <div style={{ display: "flex", alignItems: "center" }}>
-                        <FileEarmark size={48} />
-                        <p
+                  {messages.map((msg, index) => (
+                    <div
+                      key={index}
+                      style={{
+                        marginBottom: "10px",
+                        textAlign:
+                          msg.senderId === currentUser?.uid ? "right" : "left",
+                      }}
+                    >
+                      {msg.type === "text" && (
+                        <div
                           style={{
-                            margin: "0 0 0 10px",
-                            fontSize: "0.875rem",
-                            color: "#666",
-                            whiteSpace:"pre-line"
+                            display: "inline-block",
+                            padding: "8px 12px",
+                            backgroundColor: msg.senderId === currentUser!.uid ? "#3E7BE7" : "#D6E6FF",
+                            color: msg.senderId === currentUser!.uid ? "white" : "black",
+                            borderRadius: msg.senderId === currentUser!.uid ? "10px 10px 0 10px" : "10px 10px 10px 0",
+                            maxWidth: "60%",
+                            boxShadow: "0 1px 1px rgba(0, 0, 0, 0.1)",
+                            alignSelf: msg.senderId === currentUser!.uid ? "flex-end" : "flex-start",
                           }}
                         >
-                         {msg.caption ? msg.caption.split("\n")[0] : "File Attachment"}
-                        </p>
+                          <p style={{ margin: 0 }}>{msg.content}</p>
+                          <DeleteMessage messageId={msg.id} onDelete={handleDeleteMessage} />
+                        </div>
+                      )}
+                      {msg.type === "image" && (
+                        <div
+                          style={{
+                            display: "inline-block",
+                            padding: "8px 12px",
+                            backgroundColor: "#ffffff",
+                            borderRadius: "10px 10px 10px 0",
+                            border: "1px solid #ddd",
+                            maxWidth: "200px",
+                            width: "auto",
+                            boxShadow: "0 1px 1px rgba(0, 0, 0, 0.1)",
+                          }}
+                        >
+                          <img
+                            src={msg.content}
+                            alt="Sent"
+                            style={{
+                              maxWidth: "100%",
+                              borderRadius: "5px",
+                              cursor: "pointer",
+                            }}
+                            onClick={() => openViewer(msg.content, "image")}
+                          />
+                          {msg.caption && msg.caption.split("\n").length > 1 && (
+                            <div
+                              style={{
+                                marginTop: "0px",
+                                padding: "8px",
+                                backgroundColor: "#f0f0f0",
+                                borderRadius: "5px",
+                              }}
+                            >
+                              <p
+                                style={{
+                                  margin: 0,
+                                  fontSize: "0.875rem",
+                                  color: "#666",
+                                  whiteSpace: "pre-line",
+                                }}
+                              >
+                                {msg.caption.split("\n").slice(1).join("\n")}
+                              </p>
+                            </div>
+                          )}
+                          <DeleteMessage messageId={msg.id} onDelete={handleDeleteMessage} />
+                        </div>
+                      )}
+                      {msg.type === "audio" && (
+                        <div
+                          style={{
+                            display: "inline-block",
+                            padding: "8px 12px",
+                            backgroundColor: "#ffffff",
+                            borderRadius: "10px 10px 10px 0",
+                            border: "1px solid #ddd",
+                            maxWidth: "300px",
+                            boxShadow: "0 1px 1px rgba(0, 0, 0, 0.1)",
+                          }}
+                        >
+                          <audio controls src={msg.content} style={{
+                            maxWidth: "100%",
+                            display: "block",
+                            boxSizing: "border-box",
+                          }} />
+                          <DeleteMessage messageId={msg.id} onDelete={handleDeleteMessage} />
+                        </div>
+                      )}
+                      {msg.type === "file" && (
+                        <div
+                          style={{
+                            display: "inline-block",
+                            padding: "8px 12px",
+                            backgroundColor: "#ffffff",
+                            borderRadius: "10px 10px 10px 0",
+                            border: "1px solid #ddd",
+                            maxWidth: "300px",
+                            width: "auto",
+                            boxShadow: "0 1px 1px rgba(0, 0, 0, 0.1)",
+                            cursor: "pointer",
+                          }}
+                          onClick={() => {
+                            const type = msg.content.startsWith("data:image/")
+                              ? "image"
+                              : msg.content.startsWith("data:video/")
+                                ? "video"
+                                : "document";
+                            openViewer(msg.content, type);
+                          }}
+                        >
+                          {msg.content.startsWith("data:image/") ? (
+                            <img
+                              src={msg.content}
+                              alt="File Preview"
+                              style={{ maxWidth: "100%", borderRadius: "5px" }}
+                            />
+                          ) : msg.content.startsWith("data:video/") ? (
+                            <video
+                              controls
+                              src={msg.content}
+                              style={{ maxWidth: "100%", borderRadius: "5px" }}
+                            />
+                          ) : (
+                            <div style={{ display: "flex", alignItems: "center" }}>
+                              <FileEarmark size={48} />
+                              <p
+                                style={{
+                                  margin: "0 0 0 10px",
+                                  fontSize: "0.875rem",
+                                  color: "#666",
+                                  whiteSpace: "pre-line"
+                                }}
+                              >
+                                {msg.caption ? msg.caption.split("\n")[0] : "File Attachment"}
+                              </p>
+                            </div>
+                          )}
+                          {msg.caption && msg.caption.split("\n").length > 1 && (
+                            <div
+                              style={{
+                                marginTop: "10px",
+                                padding: "8px",
+                                backgroundColor: "#f0f0f0",
+                                borderRadius: "5px",
+                              }}
+                            >
+                              <p
+                                style={{
+                                  margin: 0,
+                                  fontSize: "0.875rem",
+                                  color: "#666",
+                                  whiteSpace: "pre-line",
+                                }}
+                              >
+                                {msg.caption.split("\n").slice(1).join("\n")}
+                              </p>
+                            </div>
+                          )}
+                          <DeleteMessage messageId={msg.id} onDelete={handleDeleteMessage} />
+                        </div>
+                      )}
+                      <div
+                        style={{
+                          fontSize: "0.75rem",
+                          color: "#666",
+                          marginTop: "4px",
+                        }}
+                      >
+                        {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </div>
-                      
-                    )}
-      {/* Additional Text (Caption) */}
-    {msg.caption && msg.caption.split("\n").length > 1 && (
-      <div
-        style={{
-          marginTop: "10px",
-          padding: "8px",
-          backgroundColor: "#f0f0f0", // Light background for the text
-          borderRadius: "5px",
-        }}
-      >
-        <p
-          style={{
-            margin: 0,
-            fontSize: "0.875rem",
-            color: "#666",
-            whiteSpace: "pre-line", // Preserve line breaks in the caption
-          }}
-        >
-          {msg.caption.split("\n").slice(1).join("\n")} {/* Display the additional text */}
-        </p>
-      </div>
-    )}
-    <DeleteMessage messageId={msg.id} onDelete={handleDeleteMessage} />
-                  </div>
-                )}
-                <div
-                  style={{
-                    fontSize: "0.75rem",
-                    color: "#666",
-                    marginTop: "4px",
-                  }}
-                >
-                 {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
- </div>
-              </div>
-            ))}
-            </div>
-    ))
+                    </div>
+                  ))}
+                </div>
+              ))
             )}
-          
             {isEditingImage && capturedImage && (
               <div style={{ marginBottom: "10px", textAlign: "center" }}>
                 <div style={{ position: "relative", display: "inline-block" }}>
@@ -1014,194 +898,178 @@ console.log("Active Chat User ID:", activeChatUser?._id);
                 </div>
               </div>
             )}
-            
           </div>
 
-          
           <div
-  style={{
-    padding: "10px",
-    backgroundColor: "#f0f0f0",
-    borderTop: "1px solid #ddd",
-    position: "sticky",
-    bottom: 0,
-    width: "100%",
-  }}
->
-{cameraStream && (
-  <div style={{ marginBottom: "10px", textAlign: "center" }}>
-    <video
-      ref={videoRef}
-      autoPlay
-      style={{ maxWidth: "100%", borderRadius: "10px" }}
-    />
-    <Button variant="danger" onClick={closeCamera} style={{ marginTop: "10px" }}>
-      Close Camera
-    </Button>
-    <Button
-      variant="primary"
-      onClick={capturePhoto}
-      style={{ marginTop: "10px", marginLeft: "10px" }}
-    >
-      Capture Photo
-    </Button>
-  </div>
-)}
-
-
-  {/* Preview File Section */}
-  {(previewFile )&& (
-    <div
-      style={{
-        marginBottom: "10px",
-        textAlign: "center",
-        position: "relative",
-        maxHeight: "200px",
-        overflowY: "auto",
-      }}
-    >
-      {previewFileType === "image" && previewFile && (
-        <img
-          src={URL.createObjectURL(previewFile)}
-          alt="Preview"
-          style={{ maxWidth: "100%", borderRadius: "10px" }}
-        />
-      )}
-      {previewFileType === "video" && (
-        <video
-          controls
-          src={URL.createObjectURL(previewFile)}
-          style={{ maxWidth: "100%", borderRadius: "10px" }}
-        />
-      )}
-      {previewFileType === "document" && (
-        <div
-          style={{
-            padding: "10px",
-            backgroundColor: "#ffffff",
-            borderRadius: "10px",
-            maxWidth: "90%",
-            margin: "0 auto",
-          }}
-        >
-          <FileEarmark size={48} />
-          <p>{previewFile.name}</p>
-        </div>
-      )}
-      {/* Close Button */}
-      <Button
-        variant="close"
-        size="sm"
-        onClick={closePreview}
-        style={{
-          position: "absolute",
-          top: "10px",
-          right: "10px",
-          zIndex: 1000,
-          backgroundColor: "rgba(255, 255, 255, 0.8)",
-          borderRadius: "50%",
-          padding: "5px",
-        }}
-      >
-        ×
-      </Button>
-    </div>
-  )}
-
-  {/* Input Field and Attachment Menu */}
- {activeChatUser && (<Form>
-    <Form.Group className="d-flex align-items-center">
-      {/* Attachment Button */}
-      <Button
-        variant="light"
-        style={{ borderRadius: "50%", marginRight: "10px" }}
-        onClick={() => setShowAttachmentMenu(!showAttachmentMenu)}
-      >
-        <Plus size={20} />
-      </Button>
-
-      {/* Attachment Menu */}
-      {showAttachmentMenu && (
-        <div
-          ref={attachmentMenuRef}
-          style={{
-            position: "absolute",
-            bottom: "60px", // Adjust this value if needed
-            left: "10px",
-            backgroundColor: "#ffffff",
-            borderRadius: "10px",
-            boxShadow: "0 2px 5px rgba(0, 0, 0, 0.1)",
-            padding: "10px",
-            width: "200px",
-            zIndex: 1000, // Ensure the menu is above other elements
-          }}
-        >
-          <div
-            style={{ display: "flex", alignItems: "center", padding: "8px", cursor: "pointer" }}
-            onClick={() => handleAttachmentClick("document")}
+            style={{
+              padding: "10px",
+              backgroundColor: "#f0f0f0",
+              borderTop: "1px solid #ddd",
+              position: "sticky",
+              bottom: 0,
+              width: "100%",
+            }}
           >
-            <FileEarmark size={18} style={{ marginRight: "10px" }} />
-            <span>Document</span>
+            {cameraStream && (
+              <div style={{ marginBottom: "10px", textAlign: "center" }}>
+                <video
+                  ref={videoRef}
+                  autoPlay
+                  style={{ maxWidth: "100%", borderRadius: "10px" }}
+                />
+                <Button variant="danger" onClick={closeCamera} style={{ marginTop: "10px" }}>
+                  Close Camera
+                </Button>
+                <Button
+                  variant="primary"
+                  onClick={capturePhoto}
+                  style={{ marginTop: "10px", marginLeft: "10px" }}
+                >
+                  Capture Photo
+                </Button>
+              </div>
+            )}
+
+            {(previewFile) && (
+              <div
+                style={{
+                  marginBottom: "10px",
+                  textAlign: "center",
+                  position: "relative",
+                  maxHeight: "200px",
+                  overflowY: "auto",
+                }}
+              >
+                {previewFileType === "image" && previewFile && (
+                  <img
+                    src={URL.createObjectURL(previewFile)}
+                    alt="Preview"
+                    style={{ maxWidth: "100%", borderRadius: "10px" }}
+                  />
+                )}
+                {previewFileType === "video" && (
+                  <video
+                    controls
+                    src={URL.createObjectURL(previewFile)}
+                    style={{ maxWidth: "100%", borderRadius: "10px" }}
+                  />
+                )}
+                {previewFileType === "document" && (
+                  <div
+                    style={{
+                      padding: "10px",
+                      backgroundColor: "#ffffff",
+                      borderRadius: "10px",
+                      maxWidth: "90%",
+                      margin: "0 auto",
+                    }}
+                  >
+                    <FileEarmark size={48} />
+                    <p>{previewFile.name}</p>
+                  </div>
+                )}
+                <Button
+                  variant="close"
+                  size="sm"
+                  onClick={closePreview}
+                  style={{
+                    position: "absolute",
+                    top: "10px",
+                    right: "10px",
+                    zIndex: 1000,
+                    backgroundColor: "rgba(255, 255, 255, 0.8)",
+                    borderRadius: "50%",
+                    padding: "5px",
+                  }}
+                >
+                  ×
+                </Button>
+              </div>
+            )}
+
+            {activeChatUser && (<Form>
+              <Form.Group className="d-flex align-items-center">
+                <Button
+                  variant="light"
+                  style={{ borderRadius: "50%", marginRight: "10px" }}
+                  onClick={() => setShowAttachmentMenu(!showAttachmentMenu)}
+                >
+                  <Plus size={20} />
+                </Button>
+
+                {showAttachmentMenu && (
+                  <div
+                    ref={attachmentMenuRef}
+                    style={{
+                      position: "absolute",
+                      bottom: "60px",
+                      left: "10px",
+                      backgroundColor: "#ffffff",
+                      borderRadius: "10px",
+                      boxShadow: "0 2px 5px rgba(0, 0, 0, 0.1)",
+                      padding: "10px",
+                      width: "200px",
+                      zIndex: 1000,
+                    }}
+                  >
+                    <div
+                      style={{ display: "flex", alignItems: "center", padding: "8px", cursor: "pointer" }}
+                      onClick={() => handleAttachmentClick("document")}
+                    >
+                      <FileEarmark size={18} style={{ marginRight: "10px" }} />
+                      <span>Document</span>
+                    </div>
+                    <div
+                      style={{ display: "flex", alignItems: "center", padding: "8px", cursor: "pointer" }}
+                      onClick={() => handleAttachmentClick("image")}
+                    >
+                      <Image size={18} style={{ marginRight: "10px" }} />
+                      <span>Photos & Videos</span>
+                    </div>
+                    <div
+                      style={{ display: "flex", alignItems: "center", padding: "8px", cursor: "pointer" }}
+                      onClick={() => handleAttachmentClick("camera")}
+                    >
+                      <Camera size={18} style={{ marginRight: "10px" }} />
+                      <span>Camera</span>
+                    </div>
+                  </div>
+                )}
+
+                <Button
+                  variant="light"
+                  style={{ borderRadius: "50%", marginRight: "10px" }}
+                  onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                >
+                  <EmojiSmile size={20} />
+                </Button>
+
+                {previewFileType !== "audio" && (
+                  <Form.Control
+                    type="text"
+                    placeholder="Type a message"
+                    value={message}
+                    onChange={handleInputChange}
+                    style={{ flex: 1, borderRadius: "20px", border: "none", marginRight: "10px" }}
+                  />
+                )}
+
+                {(isTyping || previewFile || editedImage) ? (
+                  <Button variant="success" onClick={handleSendMessage} style={{ borderRadius: "50%" }}>
+                    <Send size={20} />
+                  </Button>
+                ) : (
+                  <VoiceRecorder onRecorded={handleAudioRecorded} onSend={handleSendMessage} />
+                )}
+              </Form.Group>
+            </Form>)}
+
+            {showEmojiPicker && (
+              <div ref={emojiPickerRef} style={{ position: "absolute", bottom: "60px", right: "10px" }}>
+                <EmojiPicker onEmojiClick={handleEmojiClick} />
+              </div>
+            )}
           </div>
-          <div
-            style={{ display: "flex", alignItems: "center", padding: "8px", cursor: "pointer" }}
-            onClick={() => handleAttachmentClick("image")}
-          >
-            <Image size={18} style={{ marginRight: "10px" }} />
-            <span>Photos & Videos</span>
-          </div>
-          <div
-            style={{ display: "flex", alignItems: "center", padding: "8px", cursor: "pointer" }}
-            onClick={() => handleAttachmentClick("camera")}
-          >
-            <Camera size={18} style={{ marginRight: "10px" }} />
-            <span>Camera</span>
-          </div>
-        </div>
-      )}
-
-      {/* Emoji Button */}
-      <Button
-        variant="light"
-        style={{ borderRadius: "50%", marginRight: "10px" }}
-        onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-      >
-        <EmojiSmile size={20} />
-      </Button>
-
-      {/* Message Input */}
-       {previewFileType !== "audio" && (
-    <Form.Control
-      type="text"
-      placeholder="Type a message"
-      value={message}
-      onChange={handleInputChange}
-      style={{ flex: 1, borderRadius: "20px", border: "none", marginRight: "10px" }}
-    />
-  )}
-
-
-      {/* Send/Record Button */}
-      {(isTyping || previewFile || editedImage) ? (
-        <Button variant="success" onClick={handleSendMessage} style={{ borderRadius: "50%" }}>
-          <Send size={20} />
-        </Button>
-      ) : (
-        // <Button variant="light" style={{ borderRadius: "50%" }}>
-        //   <Mic size={20} />
-        // </Button>
-        <VoiceRecorder onRecorded={handleAudioRecorded} onSend={handleSendMessage}/>
-      )}
-    </Form.Group>
-  </Form>)}
-
-  {/* Emoji Picker */}
-  {showEmojiPicker && (
-    <div ref={emojiPickerRef} style={{ position: "absolute", bottom: "60px", right: "10px" }}>
-      <EmojiPicker onEmojiClick={handleEmojiClick} />
-    </div>
-  )}
-</div>
         </Col>
       </Row>
       <input
@@ -1211,7 +1079,6 @@ console.log("Active Chat User ID:", activeChatUser?._id);
         onChange={handleFileInputChange}
       />
 
-      {/* Viewer Modal */}
       <Modal
         show={viewerModalVisible}
         onHide={closeViewer}
