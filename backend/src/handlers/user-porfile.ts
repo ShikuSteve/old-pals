@@ -1,9 +1,7 @@
 import mongoose, { Types } from "mongoose";
 import { User } from "../model";
-import {  UserProfileInput } from "../types";
-import bcrypt from "bcrypt";
-
-
+import { UserProfileInput } from "../types";
+import bcrypt from "bcryptjs";
 
 export async function userProfile({ userId, profileData }: UserProfileInput) {
   console.log("Updating user profile with:", profileData);
@@ -14,13 +12,15 @@ export async function userProfile({ userId, profileData }: UserProfileInput) {
     fullName: profileData.fullName,
     school: profileData.school,
     country: profileData.country,
-    hometown: profileData.hometown && profileData.hometown.trim() !== "" 
-      ? profileData.hometown 
-      : undefined, // Prevent saving empty strings
-    interest:Array.isArray(profileData.interest) && profileData.interest.length > 0
-    ? profileData.interest
-    : undefined,
-    profilePhoto: profileData.profilePhoto
+    hometown:
+      profileData.hometown && profileData.hometown.trim() !== ""
+        ? profileData.hometown
+        : undefined, // Prevent saving empty strings
+    interest:
+      Array.isArray(profileData.interest) && profileData.interest.length > 0
+        ? profileData.interest
+        : undefined,
+    profilePhoto: profileData.profilePhoto,
   };
 
   // Remove undefined values so they don’t overwrite existing data
@@ -30,7 +30,9 @@ export async function userProfile({ userId, profileData }: UserProfileInput) {
 
   console.log("Final update object:", filteredUpdates);
 
-  const updatedUser = await User.findByIdAndUpdate(userId, filteredUpdates, { new: true });
+  const updatedUser = await User.findByIdAndUpdate(userId, filteredUpdates, {
+    new: true,
+  });
 
   console.log("Updated user:", updatedUser);
   return updatedUser;
@@ -60,11 +62,6 @@ export async function deleteUserByEmail(email: string, password: string) {
   return { message: "User deleted successfully" };
 }
 
-
-
-
-
-
 export async function addFriend(userId: string, friendId: string) {
   const user = await User.findById(userId);
   const friend = await User.findById(friendId);
@@ -88,7 +85,6 @@ export async function addFriend(userId: string, friendId: string) {
   return { message: "Friend added successfully" };
 }
 
-
 export async function getUserFriendsHandler(userId: string) {
   const user = await User.findById(userId).populate("friends");
   if (!user) {
@@ -97,9 +93,9 @@ export async function getUserFriendsHandler(userId: string) {
   return user.friends;
 }
 
-export async function checkFriendStatus(userId:string,friendId:string){
-  if(!userId||!friendId){
-    throw new Error("The UserId and the FriendId are required")
+export async function checkFriendStatus(userId: string, friendId: string) {
+  if (!userId || !friendId) {
+    throw new Error("The UserId and the FriendId are required");
   }
   const user = await User.findById(userId);
   const friend = await User.findById(friendId);
@@ -108,9 +104,8 @@ export async function checkFriendStatus(userId:string,friendId:string){
     throw new Error("User or friend not found");
   }
 
-  const isFriend=user.friends.some((id:any)=>id.toString()===friendId)
-return isFriend
-
+  const isFriend = user.friends.some((id: any) => id.toString() === friendId);
+  return isFriend;
 }
 
 // export async function getUsersHandler(userId: string) {
@@ -133,16 +128,15 @@ export async function getUsersHandler(userId: string) {
   return users;
 }
 
-export async function getUserProfiles(userId:string){
+export async function getUserProfiles(userId: string) {
   if (!mongoose.Types.ObjectId.isValid(userId)) {
     throw new Error("Invalid user ID format");
   }
-  const user=await User.findById(userId).select("-password")
+  const user = await User.findById(userId).select("-password");
 
   if (!user) {
     throw new Error("User not found");
   }
 
-  return user
-
+  return user;
 }

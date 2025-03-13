@@ -3,18 +3,20 @@ import http from "http";
 import path from "path";
 import multer from "multer";
 import { Server } from "socket.io";
-import cors from "cors"
-import {mainroutes} from "./routes/main"
-import type { NextFunction, Request, Response } from "express";
+import cors from "cors";
+import { mainroutes } from "./routes/main";
+import type { Request, Response } from "express";
 import mongoose from "mongoose";
 
 // Set up MongoDB connection
-const MONGO_URI = process.env.MONGO_URI || "mongodb+srv://Shiku_Steve:10102003Shiku!@cluster0.7arwftj.mongodb.net/com312?retryWrites=true&w=majority&appName=Cluster0";
+const MONGO_URI =
+  process.env.MONGO_URI ||
+  "mongodb+srv://shalinewambui04:rQihPLvWVPcI8kH6@cluster0.gbkwa.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0";
 
-mongoose.connect(MONGO_URI)
+mongoose
+  .connect(MONGO_URI)
   .then(() => console.log("MongoDB connected"))
   .catch((error) => console.error("MongoDB connection error:", error));
-
 
 const app = express();
 
@@ -27,8 +29,6 @@ const server = http.createServer(app);
 const io = new Server(server, {
   cors: { origin: "*" }, // adjust for your security needs
 });
-
-
 
 // Set up static file serving for uploaded files
 app.use("/uploads", express.static("uploads"));
@@ -48,7 +48,7 @@ const upload = multer({ storage });
 app.post(
   "/upload",
   upload.single("file"),
-  (req: Request, res: Response, next: NextFunction): void => {
+  (req: Request, res: Response): void => {
     if (!req.file) {
       res.status(400).json({ error: "No file uploaded" });
       return;
