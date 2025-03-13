@@ -30,6 +30,7 @@ import { DummyUser, Message } from "../utils/types";
 import { groupMessagesByDate } from "../utils/date";
 import NoChatsMessage from "./no-chats";
 import DeleteMessage from "./delete";
+import { getLastMessagePreview } from "../utils/last-message";
 
 
 const backgroundStyle: React.CSSProperties = {
@@ -87,15 +88,17 @@ const MessagingPage: React.FC = () => {
   >(null);
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [isCameraOpen, setIsCameraOpen] = useState(false);
+  
 
   const emojiPickerRef = useRef<HTMLDivElement>(null);
   const attachmentMenuRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
-    const [fetchFriends,{isLoading:isFetchingUser,isError:isFriendsError}]=useLazyGetFriendsQuery()
+    const [fetchFriends,{isError:isFriendsError}]=useLazyGetFriendsQuery()
     const[sendMessage]=useSendMessageMutation()
     const[fetchMessages,{isLoading,isError}]=useLazyGetMessagesQuery()
     const [deleteMessages] = useDeleteMessagesMutation();
+    const [isFetchingUser, setIsFetchingUser] = useState(false);
   // Create a ref to store the socket instanceF
   const socketRef = useRef<Socket | null>(null);
 
@@ -109,29 +112,73 @@ const MessagingPage: React.FC = () => {
 
   // Fetch friends when the component mounts
   useEffect(() => {
-    
     const fetchData = async () => {
-      if (currentUser ) {
-        const { data, error } = await fetchFriends(currentUser.uid); // Fetch friends from Firestore
+      if (!currentUser) return;
+  
+      setIsFetchingUser(true); // Start loading
+  
+      try {
+        const { data, error } = await fetchFriends(currentUser.uid);
+  
         if (error) {
           console.error("Error fetching friends:", error);
         } else {
-          console.log("Friends data:", data);
-          setFriends(Array.isArray(data?.friends) ? data.friends : [])
-        } // Set the fetched friends to state
+          const friendsList = data?.friends || [];
+  
+          const friendsWithLastMessages = await Promise.all(
+            friendsList.map(async (friend: DummyUser) => {
+              try {
+                const roomName = [currentUser.uid, friend._id].sort().join("_");
+                const messagesResponse = await fetchMessages(roomName);
+  
+                const lastMessage =
+                  messagesResponse.data?.length > 0
+                    ? messagesResponse.data[messagesResponse.data.length - 1]
+                    : null;
+
+             
+  
+                return {
+                  ...friend,
+                  lastMessage: {
+                    preview: lastMessage
+                      ? getLastMessagePreview(lastMessage)
+                      : "No messages yet",
+                    timestamp: lastMessage ? new Date(lastMessage.timestamp) : null,
+                  },
+                  unread:0
+                  
+                };
+              } catch (err) {
+                return {
+                  ...friend,
+                  lastMessage: {
+                    preview: "Error loading messages",
+                    timestamp: null,
+                  },
+                };
+              }
+            })
+          );
+  
+          setFriends(friendsWithLastMessages);
+        }
+      } catch (err) {
+        console.error("Unexpected error:", err);
+      } finally {
+        setIsFetchingUser(false); // Stop loading
       }
     };
-
+  
     fetchData();
-  }, [currentUser,fetchFriends ]);
+  }, [currentUser, fetchFriends]);
+  
 
   
   // Filter out the current logged in user from the conversation list
   const conversationUsers = friends.filter(
     (user) => user.email !== currentUser ?.email
   );
-
-
 
 
 useEffect(() => {
@@ -148,9 +195,24 @@ console.log("Active Chat User ID:", activeChatUser?._id);
         const response = await fetchMessages(roomName);
         
         if ("data" in response && response.data) {
-          setUpdatedMessages(response.data); // Ensure response.data is an array of messages
-        } else {
-          console.error("No messages found or response format incorrect");
+          // Always check if messages exist before accessing
+          const hasMessages = response.data.length > 0;
+          
+          setUpdatedMessages(hasMessages ? response.data : []);
+    
+          // Only update last message if messages exist
+          if (hasMessages) {
+            const lastMessage = response.data[response.data.length - 1];
+            setFriends(prevFriends => prevFriends.map(friend => 
+              friend._id === activeChatUser?._id ? { 
+                ...friend, 
+                lastMessage: {
+                  preview: getLastMessagePreview(lastMessage),
+                  timestamp: new Date(lastMessage.timestamp)
+                }
+              } : friend
+            ));
+          }
         }
       } catch (error) {
         console.error("Error fetching messages:", error);
@@ -170,6 +232,17 @@ console.log("Active Chat User ID:", activeChatUser?._id);
     // Listen for new messages
     socketRef.current!.on("newMessage", (incomingMessage: Message) => {
       setUpdatedMessages((prevMessages) => [...prevMessages, incomingMessage]);
+        // Update unread count if message is from another user and chat is not active
+        if (
+          incomingMessage.senderId !== currentUser.uid &&
+          activeChatUser._id !== incomingMessage.senderId
+        ) {
+          setFriends(prevFriends => prevFriends.map(friend => 
+            friend._id === incomingMessage.senderId ? 
+              { ...friend, unread: (friend.unread|| 0) + 1 } : 
+              friend
+          ));
+        }
     });
 
     return () => {
@@ -321,6 +394,17 @@ console.log("Active Chat User ID:", activeChatUser?._id);
   try {
     if (newMsg && newMsg.room) {
       await sendMessage(newMsg);
+
+      setFriends(prevFriends => prevFriends.map(friend => 
+        friend._id === activeChatUser._id ? { 
+          ...friend, 
+          lastMessage: {
+            preview: getLastMessagePreview(newMsg),
+            timestamp: newMsg.timestamp
+          }
+        } : friend
+      ));
+
     } else {
       console.error("Message object is missing required fields:", newMsg);
     }
@@ -340,8 +424,15 @@ console.log("Active Chat User ID:", activeChatUser?._id);
   const handleAudioRecorded = (blob: Blob) => {
     setAudioBlob(blob);
     setPreviewFileType("audio")
-   
+   };
+
+   const handleSelectFriend = (user: DummyUser) => {
+    setActiveChatUser(user);
+    setFriends(prevFriends => prevFriends.map(friend => 
+      friend._id === user._id ? { ...friend, unread: 0 } : friend
+    ));
   };
+  
 
   const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -506,6 +597,7 @@ console.log("Active Chat User ID:", activeChatUser?._id);
       console.error("Error deleting message:", error);
     }
   };
+  console.log(isFetchingUser,"loading user")
 
   return (
     <Container
@@ -551,15 +643,27 @@ console.log("Active Chat User ID:", activeChatUser?._id);
             {
             isFetchingUser?(
               <p style={{ padding: "10px" }}>Loading users...</p>
-            ):isFriendsError?(
+            ):(!isFetchingUser&&isFriendsError)?(
               <p style={{ padding: "10px", color: "red" }}>Error fetching users.</p>
-            ):conversationUsers.length === 0 ? (
+            ):(!isFetchingUser&&conversationUsers.length === 0 )? (
+              <div style={{ 
+                padding: "20px", 
+                textAlign: "center",
+                color: "#666"
+              }}>
               <p style={{ padding: "10px" }}>
                 {friends.length === 0
                   ?  "No other users" : "No friends found"}
               </p>
+              </div>
             ) : (
-              conversationUsers.map((user) => (
+              conversationUsers.sort((a,b)=>{
+                const aTime = a.lastMessage?.timestamp?.getTime() || 0;
+                const bTime = b.lastMessage?.timestamp?.getTime() || 0;
+                
+                // Descending order (newest first)
+                return bTime - aTime;
+              }).map((user) => (
                 <Card
                   key={user._id}
                   style={{
@@ -579,15 +683,42 @@ console.log("Active Chat User ID:", activeChatUser?._id);
                     e.currentTarget.style.transform = "none";
                     e.currentTarget.style.boxShadow = "none";
                   }}
-                  onClick={() => setActiveChatUser(user)}
+                  onClick={() => handleSelectFriend(user)}
                 >
                   <Card.Body>
                     <div style={{ display: "flex", alignItems: "center" }}>
                       <Avatar src={user.profilePhoto} size={40} />
-                      <div style={{ marginLeft: "10px" }}>
-                        <h6 style={{ margin: 0 }}>{user.fullName}</h6>
+                      <div style={{ marginLeft: "10px",flexGrow:1 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between" }}>
+            <h6 style={{ margin: 0 }}>{user.fullName}</h6>
+            {(user.unread ?? 0)> 0 && (
+              <span style={{
+                backgroundColor: "#3E7BE7",
+                color: "white",
+                borderRadius: "50%",
+                width: "20px",
+                height: "20px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: "0.75rem",
+                marginLeft: "8px"
+              }}>
+                {user.unread??0}
+              </span>
+            )}
+          </div>
+                        
                         <small style={{ color: "#666" }}>
-                          {user.lastMessage}
+                          {user.lastMessage?.preview||"No Message yet"}
+                          {user.lastMessage?.timestamp && (
+                <span style={{ marginLeft: "8px", fontSize: "0.75em" }}>
+                  {new Date(user.lastMessage.timestamp).toLocaleTimeString([],{
+                     hour: '2-digit',
+                    minute: '2-digit'
+                  })}
+                </span>
+              )}
                         </small>
                       </div>
                     </div>
@@ -646,7 +777,7 @@ console.log("Active Chat User ID:", activeChatUser?._id);
     ):isError ?(
       <p style={{ padding: "10px", color: "red" }}>Failed to load messages.</p>
     ):updatedMessages.length === 0 ? (
-      <NoChatsMessage />
+      <NoChatsMessage activeChatUser={activeChatUser}/>
     ) :
     (Object.entries(groupMessagesByDate(updatedMessages)).map(([dateKey, messages]) => (
     <div key={dateKey}>
@@ -678,21 +809,25 @@ console.log("Active Chat User ID:", activeChatUser?._id);
                     msg.senderId === currentUser?.uid ? "right" : "left",
                 }}
               >
-                {msg.type === "text" && (
-                  <div
-                    style={{
-                      display: "inline-block",
-                      padding: "8px 12px",
-                      backgroundColor: "#3E7BE7",
-                      borderRadius: "10px 10px 0 10px",
-                      maxWidth: "60%",
-                      boxShadow: "0 1px 1px rgba(0, 0, 0, 0.1)",
-                    }}
-                  >
-                    <p style={{ margin: 0,color: "#140005" }}>{msg.content}</p>
-                    <DeleteMessage messageId={msg.id} onDelete={handleDeleteMessage} />
-                  </div>
-                )}
+  {msg.type === "text" && (
+  <div
+    style={{
+      display: "inline-block",
+      padding: "8px 12px",
+      backgroundColor: msg.senderId === currentUser!.uid ? "#3E7BE7" : "#D6E6FF", // Sender: Blue, Receiver: Pastel Blue
+      color: msg.senderId === currentUser!.uid ? "white" : "black", // Text color
+      borderRadius: msg.senderId === currentUser!.uid ? "10px 10px 0 10px" : "10px 10px 10px 0",
+      maxWidth: "60%",
+      boxShadow: "0 1px 1px rgba(0, 0, 0, 0.1)",
+      alignSelf: msg.senderId === currentUser!.uid ? "flex-end" : "flex-start",
+    }}
+  >
+    <p style={{ margin: 0 }}>{msg.content}</p>
+    <DeleteMessage messageId={msg.id} onDelete={handleDeleteMessage} />
+  </div>
+)}
+
+
                 {msg.type === "image" && (
                   <div
                     style={{
@@ -974,7 +1109,7 @@ console.log("Active Chat User ID:", activeChatUser?._id);
   )}
 
   {/* Input Field and Attachment Menu */}
-  <Form>
+ {activeChatUser && (<Form>
     <Form.Group className="d-flex align-items-center">
       {/* Attachment Button */}
       <Button
@@ -1058,7 +1193,7 @@ console.log("Active Chat User ID:", activeChatUser?._id);
         <VoiceRecorder onRecorded={handleAudioRecorded} onSend={handleSendMessage}/>
       )}
     </Form.Group>
-  </Form>
+  </Form>)}
 
   {/* Emoji Picker */}
   {showEmojiPicker && (
