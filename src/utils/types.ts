@@ -31,12 +31,20 @@ export type AudioMessage = BaseMessage & {
 
  export type Message = TextMessage | ImageMessage | FileMessage | AudioMessage;
 
+ type LastMessage = {
+  preview: string;
+  timestamp: Date | null;
+};
+
+
 export interface DummyUser {
   email: string;
   _id: string;
   fullName: string;
-  lastMessage?: string;
+  lastMessage?: LastMessage;
   profilePhoto?: string;
+  unread?:number
+  
 }
 
 export const interestOptions = [
